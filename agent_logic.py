@@ -1,26 +1,21 @@
-# agent_logic.py
 """
-Agent Logic - Refactored to use modular architecture
+Agent Logic - Multi-Agent System Integration
 
-Uses new tool classes, LLM service, and centralized configuration.
-Clean separation of concerns following SOLID principles.
+Uses new AgentManager or MultiAgentManager based on configuration.
+Provides backward-compatible interface for API routes.
 """
 
-import operator
-from typing import TypedDict, Annotated, List
 from dotenv import load_dotenv
 
-# --- LangChain & LangGraph Imports ---
-from langchain_core.messages import HumanMessage, AIMessage
-from langgraph.graph import StateGraph, END, MessagesState
-from langgraph.prebuilt import ToolNode
-
-# --- Import our modular components ---
+# Import modular components
 from src.core.config import settings
-from src.core.agent import AgentManager
+from src.core.agent import AgentManager, MultiAgentManager
 from src.services.logging_service import LoggingService
 from src.services.llm_service import LLMService
 from src.core.memory import get_memory_service
+from src.routing import RoutingStrategy
+
+# Import tools
 from src.tools.search import SearchTool
 from src.tools.scraper import ScraperTool
 from src.tools.calculator import CalculatorTool
@@ -28,149 +23,186 @@ from src.tools.extractor import ExtractorTool
 from src.tools.list_tools import ListToolsTool
 from src.tools.chunk_reader import GetNextChunkTool
 
+# Import new advanced tools
+from src.tools.extract_structured import ExtractStructuredTool
+from src.tools.extract_advanced import (
+    ExtractTableTool, ExtractLinksTool, ExtractImagesTool, ExtractTextBlocksTool
+)
+from src.tools.browse_advanced import (
+    BrowseAndWaitTool, BrowseWithScrollTool, BrowseWithClickTool
+)
+from src.tools.browse_forms import (
+    BrowseWithFormTool, BrowseWithAuthTool, BrowseMultiPageTool
+)
+from src.tools.analysis_tools import (
+    AnalyzeSentimentTool, SummarizeContentTool, CompareDataTool, ValidateDataTool
+)
+
 load_dotenv()
 
-# --- Initialize services ---
+# Initialize services
 logger = LoggingService(settings.logging_url)
 llm_service = LLMService(settings)
 memory_service = get_memory_service("data/conversations.db")
 
-# Global AgentManager instance (initialized once)
+# Global manager instance
 _agent_manager = None
 
+# Configuration: Set to True to enable multi-agent system
+USE_MULTI_AGENT_SYSTEM = True  # Change to False for classic mode
+
+
 def get_agent_manager():
-    """Get or create the global AgentManager instance."""
+    """
+    Get or create the global AgentManager/MultiAgentManager instance.
+    
+    Returns:
+        AgentManager or MultiAgentManager instance
+    """
     global _agent_manager
     if _agent_manager is None:
-        # Create tools for global use
+        # Create tools
         tools = create_tools_for_session("global")
-        _agent_manager = AgentManager(
-            llm_service=llm_service,
-            memory_service=memory_service,
-            logging_service=logger,
-            tools=tools
-        )
-        print("[AgentManager] Global instance created")
+        
+        if USE_MULTI_AGENT_SYSTEM:
+            # Use multi-agent system with intelligent routing
+            _agent_manager = MultiAgentManager(
+                llm_service=llm_service,
+                memory_service=memory_service,
+                logging_service=logger,
+                tools=tools,
+                enable_routing=True,
+                routing_strategy=RoutingStrategy.BALANCED
+            )
+            print("[AgentLogic] Multi-Agent system initialized with intelligent routing")
+        else:
+            # Use classic AgentManager
+            _agent_manager = AgentManager(
+                llm_service=llm_service,
+                memory_service=memory_service,
+                logging_service=logger,
+                tools=tools
+            )
+            print("[AgentLogic] Classic AgentManager initialized")
+    
     return _agent_manager
 
+
 def create_tools_for_session(session_id: str):
-    """Create tools for a specific session."""
-    # Initialize tools with logger and settings
+    """
+    Create tools for a specific session.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        List of tool instances
+    """
+    # Initialize base tools
     search_tool = SearchTool(logger)
     scraper_tool = ScraperTool(session_id, logger, settings)
     calculator_tool = CalculatorTool(logger)
     extractor_tool = ExtractorTool(logger)
     chunk_reader_tool = GetNextChunkTool(session_id, logger)
     
-    # Create list of base tools for the list_tools meta-tool
-    base_tools = [search_tool, scraper_tool, calculator_tool, extractor_tool, chunk_reader_tool]
+    # Initialize extraction tools
+    extract_structured_tool = ExtractStructuredTool(session_id, logger, settings)
+    extract_table_tool = ExtractTableTool(session_id, logger, settings)
+    extract_links_tool = ExtractLinksTool(session_id, logger, settings)
+    extract_images_tool = ExtractImagesTool(session_id, logger, settings)
+    extract_text_blocks_tool = ExtractTextBlocksTool(session_id, logger, settings)
     
-    # Initialize list_tools meta-tool with the base tools
-    list_tools_tool = ListToolsTool(base_tools, logger)
+    # Initialize advanced browsing tools
+    browse_and_wait_tool = BrowseAndWaitTool(session_id, logger, settings)
+    browse_with_scroll_tool = BrowseWithScrollTool(session_id, logger, settings)
+    browse_with_click_tool = BrowseWithClickTool(session_id, logger, settings)
     
-    # Return BaseTool instances (AgentManager will convert them to LangChain tools)
-    return base_tools + [list_tools_tool]
+    # Initialize form and navigation tools
+    browse_with_form_tool = BrowseWithFormTool(session_id, logger, settings)
+    browse_with_auth_tool = BrowseWithAuthTool(session_id, logger, settings)
+    browse_multi_page_tool = BrowseMultiPageTool(session_id, logger, settings)
+    
+    # Initialize analysis tools
+    analyze_sentiment_tool = AnalyzeSentimentTool(session_id, logger, settings, llm_service)
+    summarize_content_tool = SummarizeContentTool(session_id, logger, settings, llm_service)
+    compare_data_tool = CompareDataTool(session_id, logger, settings)
+    validate_data_tool = ValidateDataTool(session_id, logger, settings)
+    
+    # Create list of all tools
+    all_tools = [
+        # Base tools
+        search_tool,
+        scraper_tool,
+        calculator_tool,
+        extractor_tool,
+        chunk_reader_tool,
+        # Extraction tools
+        extract_structured_tool,
+        extract_table_tool,
+        extract_links_tool,
+        extract_images_tool,
+        extract_text_blocks_tool,
+        # Browsing tools
+        browse_and_wait_tool,
+        browse_with_scroll_tool,
+        browse_with_click_tool,
+        browse_with_form_tool,
+        browse_with_auth_tool,
+        browse_multi_page_tool,
+        # Analysis tools
+        analyze_sentiment_tool,
+        summarize_content_tool,
+        compare_data_tool,
+        validate_data_tool
+    ]
+    
+    # Initialize list_tools meta-tool
+    list_tools_tool = ListToolsTool(all_tools, logger)
+    
+    # Return all tools including meta-tool
+    return all_tools + [list_tools_tool]
 
 
-
-# --- LangGraph Agent Implementation ---
-
-# Define the function that determines whether to continue or not
-def should_continue(state: MessagesState):
-    """Decides whether to continue the loop or end."""
-    messages = state['messages']
-    last_message = messages[-1]
-    # If there are no tool calls, then we finish
-    # AIMessage has tool_calls, other message types don't
-    if isinstance(last_message, AIMessage) and last_message.tool_calls:  # type: ignore
-        return "continue"
-    else:
-        return "end"
-
-# Define the function that calls the model
-def call_model(state: MessagesState):
-    """This node invokes the agent to decide the next action."""
-    logger.thinking("Agent is analyzing the task...")
-    messages = state['messages']
-    
-    # DEBUG: Log what's being sent to the model
-    print(f"\n[DEBUG AGENT] Calling model with {len(messages)} messages")
-    print(f"[DEBUG AGENT] Last message: {messages[-1].content if messages else 'None'}[:100]...")
-    
-    response = model.invoke(messages)  # type: ignore
-    
-    # ============ ENHANCED DEBUG LOGGING ============
-    print(f"\n{'='*80}")
-    print(f"🤖 MODEL RESPONSE DEBUG")
-    print(f"{'='*80}")
-    print(f"Response Type: {type(response)}")
-    
-    # Log content
-    if hasattr(response, 'content'):
-        content_preview = response.content[:200] if response.content else 'EMPTY/None'
-        print(f"Content Length: {len(response.content) if response.content else 0}")
-        print(f"Content Preview: {content_preview}")
-    
-    # Log tool calls
-    if hasattr(response, 'tool_calls'):
-        print(f"Tool Calls Count: {len(response.tool_calls) if response.tool_calls else 0}")
-        if response.tool_calls:
-            for i, tc in enumerate(response.tool_calls, 1):
-                print(f"  Tool {i}: {tc.get('name', 'unknown')}")
-                print(f"    Args: {tc.get('args', {})}")
-    
-    # Log metadata (safety, tokens, etc.)
-    if hasattr(response, 'response_metadata'):
-        metadata = response.response_metadata
-        print(f"\n📊 Response Metadata:")
-        print(f"  Model: {metadata.get('model_name', 'N/A')}")
-        print(f"  Finish Reason: {metadata.get('finish_reason', 'N/A')}")
-        
-        # Safety ratings
-        if 'safety_ratings' in metadata:
-            print(f"  Safety Ratings: {metadata['safety_ratings']}")
-        
-        # Prompt feedback (for blocking)
-        if 'prompt_feedback' in metadata:
-            feedback = metadata['prompt_feedback']
-            print(f"  Prompt Feedback:")
-            print(f"    Block Reason: {feedback.get('block_reason', 'N/A')}")
-            print(f"    Safety Ratings: {feedback.get('safety_ratings', [])}")
-    
-    # Log token usage
-    if hasattr(response, 'usage_metadata'):
-        usage = response.usage_metadata
-        print(f"\n🎯 Token Usage:")
-        print(f"  Input Tokens: {usage.get('input_tokens', 0)}")
-        print(f"  Output Tokens: {usage.get('output_tokens', 0)} {'⚠️ ZERO!' if usage.get('output_tokens', 0) == 0 else ''}")
-        print(f"  Total Tokens: {usage.get('total_tokens', 0)}")
-    
-    print(f"{'='*80}\n")
-    
-    # We return a list, because this will get added to the existing list
-    return {"messages": [response]}
-
-# --- This function is called by FastAPI ---
 def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     """
-    Execute agent task using the global AgentManager.
+    Execute agent task using AgentManager or MultiAgentManager.
     
-    This is now a thin wrapper that delegates to AgentManager,
-    which maintains agent state and prevents reinitialization.
+    This function maintains backward compatibility with the API routes
+    while supporting both classic and multi-agent execution modes.
+    
+    Args:
+        prompt: User's input/question
+        message_id: Unique message identifier
+        session_id: Session identifier
+        
+    Returns:
+        str: Agent's response
     """
-    print(f"[AgentLogic] Delegating to AgentManager - Session: {session_id}, Message: {message_id}")
+    print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
+    print(f"[AgentLogic] Mode: {'Multi-Agent' if USE_MULTI_AGENT_SYSTEM else 'Classic'}")
     
     try:
-        # Get the global AgentManager instance
+        # Get the global manager instance
         manager = get_agent_manager()
         
-        # Delegate execution to AgentManager
-        result = manager.execute_task(
-            prompt=prompt,
-            message_id=message_id,
-            session_id=session_id
-        )
+        # Execute based on manager type
+        if isinstance(manager, MultiAgentManager):
+            # Use multi-agent execution
+            result = manager.execute_task_multi_agent(
+                prompt=prompt,
+                message_id=message_id,
+                session_id=session_id,
+                use_reason_agent=True  # Enable planning for complex tasks
+            )
+        else:
+            # Use classic execution
+            result = manager.execute_task(
+                prompt=prompt,
+                message_id=message_id,
+                session_id=session_id
+            )
         
+        print(f"[AgentLogic] Task completed successfully")
         return result
         
     except Exception as e:
@@ -178,3 +210,23 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
         logger.error(error_msg, message_id)
         print(f"[AgentLogic] Error: {e}")
         return f"Error: {e}"
+
+
+# Utility functions for runtime configuration
+def enable_multi_agent_mode():
+    """Enable multi-agent system mode (requires restart)."""
+    global USE_MULTI_AGENT_SYSTEM
+    USE_MULTI_AGENT_SYSTEM = True
+    print("[AgentLogic] Multi-agent mode enabled (restart required)")
+
+
+def enable_classic_mode():
+    """Enable classic AgentManager mode (requires restart)."""
+    global USE_MULTI_AGENT_SYSTEM
+    USE_MULTI_AGENT_SYSTEM = False
+    print("[AgentLogic] Classic mode enabled (restart required)")
+
+
+def get_current_mode():
+    """Get current execution mode."""
+    return "Multi-Agent" if USE_MULTI_AGENT_SYSTEM else "Classic"

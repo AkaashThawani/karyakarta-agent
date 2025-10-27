@@ -210,11 +210,26 @@ def smart_compress(html: str, max_tokens: int = 1500) -> str:
     """
     soup = BeautifulSoup(html, 'html.parser')
     
-    # Remove bloat
-    for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe', 'noscript']):
+    # STEP 1: Aggressively remove all non-content elements
+    # Remove scripts, styles, and other bloat
+    for tag in soup(['script', 'style', 'link', 'meta', 'nav', 'footer', 'header', 
+                      'aside', 'iframe', 'noscript', 'svg', 'path', 'use']):
         tag.decompose()
     
-    # Remove comments
+    # Remove inline styles and onclick handlers
+    for tag in soup.find_all(True):
+        if tag.has_attr('style'):
+            del tag['style']
+        if tag.has_attr('onclick'):
+            del tag['onclick']
+        if tag.has_attr('onload'):
+            del tag['onload']
+        # Remove data attributes and IDs/classes for cleaner output
+        for attr in ['class', 'id', 'data-*']:
+            if tag.has_attr(attr):
+                del tag[attr]
+    
+    # Remove HTML comments
     for comment in soup.findAll(text=lambda text: isinstance(text, str) and '<!--' in text):
         comment.extract()
     
@@ -274,6 +289,31 @@ def smart_compress(html: str, max_tokens: int = 1500) -> str:
     result = re.sub(r'\n\n+', '\n\n', result)
     result = result.strip()
     
+    # CRITICAL: If extraction failed, use comprehensive fallback
+    if not result or len(result.strip()) < 100:
+        print(f"[SMART COMPRESS] Structured extraction failed, using comprehensive fallback")
+        
+        # Fallback strategy: Get ALL visible text content
+        # This ensures we never return empty even for unusual page structures
+        
+        # Get all text from remaining elements
+        all_text = []
+        for element in main_content.find_all(text=True, recursive=True):
+            text = element.strip()
+            # Skip empty strings and very short text (likely labels/buttons)
+            if text and len(text) > 3:
+                # Skip if it's just a number or single word (likely nav/UI)
+                if len(text.split()) > 1 or len(text) > 20:
+                    all_text.append(text)
+        
+        # Join with spacing and clean up
+        result = ' '.join(all_text)
+        result = re.sub(r' +', ' ', result)  # Collapse multiple spaces
+        result = re.sub(r'\n+', '\n', result)  # Collapse multiple newlines
+        result = result.strip()
+        
+        print(f"[SMART COMPRESS] Fallback extracted {len(result)} characters")
+    
     # Tokenize and truncate to exact limit
     try:
         encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
@@ -294,6 +334,11 @@ def smart_compress(html: str, max_tokens: int = 1500) -> str:
         char_limit = max_tokens * 4
         if len(result) > char_limit:
             result = result[:char_limit] + "\n\n[Content truncated]"
+    
+    # Final safety check: never return empty content
+    if not result or len(result.strip()) < 50:
+        print(f"[SMART COMPRESS] ERROR: Result still empty after all fallbacks!")
+        return "[Error: Could not extract any content from page]"
     
     return result
 

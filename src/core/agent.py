@@ -21,6 +21,10 @@ from src.core.memory import MemoryService
 from src.core.graph import create_workflow
 from src.services.session_service import get_session_service
 
+# Multi-agent imports
+from src.agents import ReasonAgent, ExecutorAgent, AgentTask, TaskPriority
+from src.routing import ToolRegistry, ToolRouter, RoutingStrategy, ToolCategory, CostLevel
+
 
 class AgentManager:
     """
@@ -361,3 +365,307 @@ class SimpleAgentManager:
                 return str(last_message.content)
         
         return "No response generated"
+
+
+class MultiAgentManager(AgentManager):
+    """
+    Extended Agent Manager with multi-agent system support.
+    
+    Adds intelligent tool routing, reason/executor agent coordination,
+    and advanced task management on top of the base AgentManager.
+    
+    Example:
+        manager = MultiAgentManager(
+            llm_service=llm_service,
+            memory_service=memory_service,
+            logging_service=logger,
+            tools=[search_tool, scraper_tool],
+            enable_routing=True,
+            routing_strategy=RoutingStrategy.BALANCED
+        )
+        
+        # Use multi-agent execution
+        result = manager.execute_task_multi_agent(
+            prompt="Find and analyze Python tutorials",
+            message_id="msg_123",
+            session_id="user_456"
+        )
+    """
+    
+    def __init__(
+        self,
+        llm_service: LLMService,
+        memory_service: MemoryService,
+        logging_service: LoggingService,
+        tools: List[BaseTool],
+        enable_routing: bool = True,
+        routing_strategy: RoutingStrategy = RoutingStrategy.BALANCED
+    ):
+        """
+        Initialize multi-agent manager.
+        
+        Args:
+            llm_service: Service for LLM interactions
+            memory_service: Service for conversation memory
+            logging_service: Service for real-time logging
+            tools: List of tools available
+            enable_routing: Whether to enable intelligent tool routing
+            routing_strategy: Default routing strategy
+        """
+        # Initialize base class
+        super().__init__(llm_service, memory_service, logging_service, tools)
+        
+        # Initialize tool registry and router
+        self.registry = ToolRegistry()
+        self.enable_routing = enable_routing
+        
+        # Register all tools
+        self._register_tools()
+        
+        # Create router
+        self.router = ToolRouter(self.registry, strategy=routing_strategy)
+        
+        # Create executor agent
+        self.executor = ExecutorAgent(
+            agent_id="executor_main",
+            tools=tools,
+            logger=logging_service
+        )
+        
+        # Create reason agent with executor agent reference
+        self.reason_agent = ReasonAgent(
+            agent_id="reason_main",
+            llm_service=llm_service,
+            available_tools=[t.name for t in tools],
+            executor_agents=[self.executor],  # Pass executor to reason agent
+            logger=logging_service
+        )
+        
+        print("[MultiAgentManager] Multi-agent system initialized")
+        print(f"[MultiAgentManager] Routing: {enable_routing}, Strategy: {routing_strategy.value}")
+    
+    def _register_tools(self) -> None:
+        """Register all tools in the registry with metadata."""
+        tool_categories = {
+            "google_search": ToolCategory.SEARCH,
+            "browse_website": ToolCategory.SCRAPING,
+            "scraper": ToolCategory.SCRAPING,
+            "calculator": ToolCategory.CALCULATION,
+            "extract_data": ToolCategory.DATA_PROCESSING,
+        }
+        
+        for tool in self.tools:
+            # Determine category
+            category = ToolCategory.OTHER
+            for key, cat in tool_categories.items():
+                if key in tool.name.lower():
+                    category = cat
+                    break
+            
+            # Register with default metadata
+            self.registry.register(
+                name=tool.name,
+                description=tool.description,
+                capabilities={tool.name, category.value},
+                category=category,
+                cost=CostLevel.FREE,
+                avg_latency=1.0,
+                reliability=95.0
+            )
+    
+    def execute_task_multi_agent(
+        self,
+        prompt: str,
+        message_id: str,
+        session_id: str = "default",
+        use_reason_agent: bool = True
+    ) -> str:
+        """
+        Execute task using multi-agent system.
+        
+        Args:
+            prompt: User's input/question
+            message_id: Unique message identifier
+            session_id: Session identifier
+            use_reason_agent: Whether to use reason agent for planning
+            
+        Returns:
+            str: Final response
+        """
+        print(f"[MultiAgentManager] Multi-agent execution - Session: {session_id}")
+        
+        try:
+            self.logger.thinking("Analyzing your request with multi-agent system...", message_id)
+            
+            # Create task
+            task = AgentTask(
+                task_type="user_query",
+                description=prompt,
+                parameters={"query": prompt, "session_id": session_id},
+                priority=TaskPriority.MEDIUM
+            )
+            
+            if use_reason_agent:
+                # Use reason agent for complex tasks
+                self.logger.status("Planning execution strategy...", message_id)
+                result = self.reason_agent.execute(task)
+            else:
+                # Direct execution with executor
+                self.logger.status("Executing task directly...", message_id)
+                
+                # Route to best tool if routing enabled
+                if self.enable_routing:
+                    tool_metadata = self.router.route(task)
+                    if tool_metadata:
+                        self.logger.status(f"Using tool: {tool_metadata.name}", message_id)
+                        # Update task type to match routed tool
+                        task.task_type = tool_metadata.name
+                
+                result = self.executor.execute(task)
+            
+            # Update registry stats
+            if self.enable_routing and result.metadata.get("tool"):
+                tool_name = result.metadata["tool"]
+                self.registry.update_stats(
+                    tool_name,
+                    result.is_success(),
+                    result.execution_time
+                )
+            
+            if result.is_success():
+                final_answer = self._format_result(result.data)
+                self.logger.status("Task completed successfully", message_id)
+                self.logger.response(final_answer, message_id)
+                
+                # Save to session
+                self._save_to_session(session_id, message_id, prompt, final_answer)
+                
+                return final_answer
+            else:
+                error_msg = result.get_error() or "Task execution failed"
+                self.logger.error(error_msg, message_id)
+                return f"Error: {error_msg}"
+                
+        except Exception as e:
+            error_msg = f"Multi-agent execution error: {e}"
+            self.logger.error(error_msg, message_id)
+            print(f"[MultiAgentManager] Error: {e}")
+            return f"Error: {e}"
+    
+    def _format_result(self, data: Any) -> str:
+        """Format result data into readable string."""
+        if isinstance(data, dict):
+            if "answer" in data:
+                return str(data["answer"])
+            elif "result" in data:
+                return str(data["result"])
+            # Format dict nicely
+            return "\n".join(f"{k}: {v}" for k, v in data.items() if v)
+        return str(data)
+    
+    def _save_to_session(
+        self,
+        session_id: str,
+        message_id: str,
+        prompt: str,
+        response: str
+    ) -> None:
+        """Save messages to session."""
+        try:
+            session_service = get_session_service()
+            
+            # Save user message
+            session_service.add_message_to_session(
+                session_id=session_id,
+                message_id=f"{message_id}_user",
+                role="user",
+                content=prompt,
+                tokens=len(prompt.split())
+            )
+            
+            # Save agent response
+            session_service.add_message_to_session(
+                session_id=session_id,
+                message_id=message_id,
+                role="agent",
+                content=response,
+                tokens=len(response.split())
+            )
+            
+            print(f"[MultiAgentManager] Messages saved to session {session_id}")
+        except Exception as e:
+            print(f"[MultiAgentManager] Failed to save messages: {e}")
+    
+    def get_routing_stats(self) -> Dict[str, Any]:
+        """
+        Get routing statistics.
+        
+        Returns:
+            Dictionary of routing stats
+        """
+        return {
+            "router_stats": self.router.get_stats_summary(),
+            "registry_summary": self.registry.get_summary(),
+            "executor_stats": self.executor.get_execution_stats(),
+            "reason_history": len(self.reason_agent.get_execution_history())
+        }
+    
+    def set_routing_strategy(self, strategy: RoutingStrategy) -> None:
+        """
+        Change routing strategy.
+        
+        Args:
+            strategy: New routing strategy
+        """
+        self.router.set_strategy(strategy)
+        print(f"[MultiAgentManager] Routing strategy changed to: {strategy.value}")
+    
+    def add_tool_dynamically(
+        self,
+        tool: BaseTool,
+        category: ToolCategory = ToolCategory.OTHER,
+        cost: CostLevel = CostLevel.FREE
+    ) -> None:
+        """
+        Add a new tool at runtime.
+        
+        Args:
+            tool: Tool to add
+            category: Tool category
+            cost: Cost level
+        """
+        # Add to base tools
+        self.tools.append(tool)
+        self.langchain_tools.append(tool.as_langchain_tool())
+        
+        # Register in registry
+        self.registry.register(
+            name=tool.name,
+            description=tool.description,
+            capabilities={tool.name, category.value},
+            category=category,
+            cost=cost,
+            avg_latency=1.0,
+            reliability=95.0
+        )
+        
+        # Add to executor
+        self.executor.add_tool(tool)
+        
+        print(f"[MultiAgentManager] Tool added: {tool.name}")
+    
+    def get_multi_agent_stats(self) -> Dict[str, Any]:
+        """
+        Get comprehensive multi-agent statistics.
+        
+        Returns:
+            Complete statistics dictionary
+        """
+        base_stats = self.get_stats()
+        routing_stats = self.get_routing_stats()
+        
+        return {
+            **base_stats,
+            "multi_agent": routing_stats,
+            "mode": "multi_agent"
+        }
