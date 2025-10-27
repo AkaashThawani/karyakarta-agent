@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     browserless_api_key: str
     
     # LLM Settings
-    llm_model: str = "gemini-2.5-flash-lite"
-    llm_temperature: float = 0.0
+    llm_model: str = "gemini-2.5-flash"  # Changed from lite version for better reliability
+    llm_temperature: float = 0.3  # Increased from 0.0 to encourage better response generation
     
     # Server Settings
     api_host: str = "0.0.0.0"

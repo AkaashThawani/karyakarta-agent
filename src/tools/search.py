@@ -24,11 +24,16 @@ from langchain_community.utilities import GoogleSerperAPIWrapper
 from langchain_core.tools import tool
 from src.tools.base import BaseTool, ToolResult
 from src.services.logging_service import LoggingService
+import json
 
 
 class SearchInput(BaseModel):
     """Input schema for search tool."""
     query: str = Field(description="The search query to look up on Google")
+    num_results: Optional[int] = Field(
+        default=10,
+        description="Number of search results to return (1-20). Default is 10."
+    )
 
 
 class SearchTool(BaseTool):
@@ -55,11 +60,27 @@ class SearchTool(BaseTool):
     @property
     def description(self) -> str:
         """Tool description for LLM."""
-        return "Use this tool to search Google for recent information or to find websites. Input should be a search query string."
+        return """Search Google for current information on ANY topic.
+
+USE FOR:
+- Current events, news, trends (music charts, sports scores, etc.)
+- Product information (phones, restaurants, services)
+- Location-based queries (dentists, hotels, weather)
+- Factual information (definitions, statistics, dates)
+- Website discovery (find official sites, reviews, etc.)
+
+EXAMPLES:
+- "top 10 songs 2024" → Find music charts
+- "best restaurants NYC" → Find dining options  
+- "iPhone 15 specs" → Find product details
+- "weather San Francisco" → Find weather info
+
+INPUT: Search query string + optional num_results (1-20, default 10)
+OUTPUT: Formatted, relevant search results"""
     
     def validate_params(self, **kwargs) -> bool:
         """
-        Validate that query parameter is provided.
+        Validate parameters.
         Accepts both 'query' and 'q' parameter names for flexibility.
         Handles nested kwargs from LangChain.
         """
@@ -73,33 +94,90 @@ class SearchTool(BaseTool):
             return False
         
         query_value = kwargs.get("query") or kwargs.get("q")
-        return isinstance(query_value, str) and len(query_value) > 0
+        if not isinstance(query_value, str) or len(query_value) == 0:
+            return False
+        
+        # Validate num_results if provided
+        num_results = kwargs.get("num_results", 10)
+        if not isinstance(num_results, int) or num_results < 1 or num_results > 20:
+            return False
+        
+        return True
+    
+    def _format_search_results(self, raw_results: str, query: str, num_results: int) -> str:
+        """
+        Format and compress search results ONLY if needed (> 1500 chars).
+        
+        Args:
+            raw_results: Raw search results from Serper API
+            query: Original search query
+            num_results: Number of results requested
+            
+        Returns:
+            Formatted results (or raw if short)
+        """
+        try:
+            # RULE 1: If results are short (< 1500 chars), return as-is!
+            if len(raw_results) < 1500:
+                print(f"[Search] Results short ({len(raw_results)} chars), returning as-is")
+                return raw_results
+            
+            print(f"[Search] Results long ({len(raw_results)} chars), formatting...")
+            
+            # RULE 2: Try to parse and format JSON
+            if isinstance(raw_results, str) and (raw_results.startswith('{') or raw_results.startswith('[')):
+                try:
+                    data = json.loads(raw_results)
+                    if isinstance(data, dict) and 'organic' in data:
+                        results = data['organic'][:num_results]
+                        formatted = f"**Search Results for: {query}**\n\n"
+                        for i, result in enumerate(results, 1):
+                            title = result.get('title', 'No title')
+                            snippet = result.get('snippet', 'No description')
+                            formatted += f"{i}. **{title}**\n   {snippet}\n\n"
+                        
+                        # Only return formatted if actually shorter
+                        if len(formatted) < len(raw_results):
+                            print(f"[Search] Formatted to {len(formatted)} chars")
+                            return formatted.strip()
+                except:
+                    pass
+            
+            # RULE 3: Fallback - truncate if still too long
+            if len(raw_results) > 2000:
+                return raw_results[:2000] + "..."
+            
+            return raw_results
+            
+        except Exception as e:
+            print(f"[Search] Error: {e}, returning raw")
+            return raw_results[:2000] if len(raw_results) > 2000 else raw_results
     
     def _execute_impl(self, **kwargs) -> ToolResult:
         """
-        Execute Google search with flexible parameter handling.
+        Execute Google search with formatting and compression.
         
         Args:
-            **kwargs: May contain 'query' or 'q' parameter, possibly nested in 'kwargs'
+            **kwargs: May contain 'query', 'num_results'
             
         Returns:
-            ToolResult with search results or error
+            ToolResult with formatted search results
         """
         # Handle nested kwargs from LangChain
         if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
             kwargs = kwargs["kwargs"]
         
-        # Get query parameter  
+        # Get parameters
         query = kwargs.get("query") or kwargs.get("q")
+        num_results = kwargs.get("num_results", 10)
         
         # Handle case where query might be passed as the only argument
         if not query and len(kwargs) == 1:
-            # If there's only one argument and it's a string, use it as the query
             first_value = next(iter(kwargs.values()))
             if isinstance(first_value, str):
                 query = first_value
         
-        # Type guard - should not happen due to validate_params, but needed for type checker
+        # Type guards
         if not query or not isinstance(query, str):
             return ToolResult(
                 success=False,
@@ -107,20 +185,40 @@ class SearchTool(BaseTool):
                 metadata=kwargs
             )
         
+        if not isinstance(num_results, int):
+            num_results = 10
+        num_results = max(1, min(20, num_results))  # Clamp 1-20
+        
         try:
             if self.logger:
-                self.logger.status(f"Searching Google for: {query}")
+                self.logger.status(f"Searching Google for: {query} (top {num_results} results)")
+            
+            print(f"\n[SEARCH] Query: {query}")
+            print(f"[SEARCH] Num results: {num_results}")
             
             # Execute search
-            result = self.search.run(query)
+            raw_result = self.search.run(query)
+            
+            print(f"[SEARCH] Raw result length: {len(raw_result)} characters")
+            
+            # Format and compress results
+            formatted_result = self._format_search_results(raw_result, query, num_results)
+            
+            print(f"[SEARCH] Formatted result length: {len(formatted_result)} characters")
+            print(f"[SEARCH] Compression: {(1 - len(formatted_result)/len(raw_result)) * 100:.1f}%")
             
             if self.logger:
                 self.logger.status("Google search completed")
             
             return ToolResult(
                 success=True,
-                data=result,
-                metadata={"query": query}
+                data=formatted_result,
+                metadata={
+                    "query": query,
+                    "num_results": num_results,
+                    "original_size": len(raw_result),
+                    "formatted_size": len(formatted_result)
+                }
             )
             
         except Exception as e:
@@ -144,9 +242,9 @@ class SearchTool(BaseTool):
         tool_instance = self
         
         @tool(args_schema=SearchInput)
-        def google_search(query: str) -> str:
-            """Use this tool to search Google for recent information or to find websites. Input should be a search query string."""
-            result = tool_instance.execute(query=query)
+        def google_search(query: str, num_results: int = 10) -> str:
+            """Search Google for current information on ANY topic. Works for music, food, healthcare, products, news, anything! Optionally specify num_results (1-20, default 10)."""
+            result = tool_instance.execute(query=query, num_results=num_results)
             return tool_instance.format_result(result)
         
         return google_search

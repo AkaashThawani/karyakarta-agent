@@ -19,6 +19,7 @@ from src.services.logging_service import LoggingService
 from src.services.llm_service import LLMService
 from src.core.memory import MemoryService
 from src.core.graph import create_workflow
+from src.services.session_service import get_session_service
 
 
 class AgentManager:
@@ -77,8 +78,12 @@ class AgentManager:
         # Convert BaseTool instances to LangChain tools
         self.langchain_tools = [tool.as_langchain_tool() for tool in tools]
         
-        # Cache for compiled workflows per session (optional optimization)
-        self._workflow_cache: Dict[str, Any] = {}
+        # Prepare workflow components once
+        self.model_with_tools = self.llm_service.get_model_with_tools(self.langchain_tools)
+        self.checkpointer = self.memory_service.get_checkpointer()
+        self.workflow_app = None  # Will be created on first use
+        
+        print("[AgentManager] Instance initialized with tools")
     
     def execute_task(
         self,
@@ -104,43 +109,35 @@ class AgentManager:
                 session_id="user_456"
             )
         """
-        print(f"[AgentManager] Starting task - Session: {session_id}, Message: {message_id}")
+        print(f"[AgentManager] Processing task - Session: {session_id}, Message: {message_id}")
         
         try:
-            # Log initialization
-            self.logger.status("Initializing AI agent...", message_id)
+            # Create workflow on first use (cached after that)
+            if self.workflow_app is None:
+                print("[AgentManager] Creating workflow for first time")
+                
+                # Logger callback for workflow
+                def log_callback(message: str, log_type: str):
+                    if log_type == "thinking":
+                        self.logger.thinking(message, message_id)
+                    elif log_type == "status":
+                        self.logger.status(message, message_id)
+                
+                self.workflow_app = create_workflow(
+                    tools=self.langchain_tools,
+                    model_with_tools=self.model_with_tools,
+                    checkpointer=self.checkpointer,
+                    logger_callback=log_callback
+                )
             
-            # Get model with tools bound
-            model_with_tools = self.llm_service.get_model_with_tools(
-                self.langchain_tools
-            )
-            
-            # Create workflow with memory
-            checkpointer = self.memory_service.get_checkpointer()
-            
-            # Logger callback for workflow
-            def log_callback(message: str, log_type: str):
-                if log_type == "thinking":
-                    self.logger.thinking(message, message_id)
-                elif log_type == "status":
-                    self.logger.status(message, message_id)
-            
-            workflow_app = create_workflow(
-                tools=self.langchain_tools,
-                model_with_tools=model_with_tools,
-                checkpointer=checkpointer,
-                logger_callback=log_callback
-            )
-            
-            self.logger.status("Agent initialized successfully", message_id)
-            self.logger.thinking("Starting task execution...", message_id)
+            self.logger.thinking("Processing your request...", message_id)
             
             # Get session configuration
             session_config = self.memory_service.get_session_config(session_id)
             
             # Execute workflow
             final_answer = self._stream_workflow(
-                workflow_app,
+                self.workflow_app,
                 prompt,
                 session_config,
                 message_id
@@ -149,11 +146,40 @@ class AgentManager:
             if final_answer:
                 self.logger.status("Task completed successfully", message_id)
                 self.logger.response(final_answer, message_id)
+                
+                # Save messages to session
+                try:
+                    session_service = get_session_service()
+                    
+                    # Save user message
+                    session_service.add_message_to_session(
+                        session_id=session_id,
+                        message_id=f"{message_id}_user",
+                        role="user",
+                        content=prompt,
+                        tokens=len(prompt.split())
+                    )
+                    
+                    # Save agent response
+                    session_service.add_message_to_session(
+                        session_id=session_id,
+                        message_id=message_id,
+                        role="agent",
+                        content=final_answer,
+                        tokens=len(final_answer.split())
+                    )
+                    
+                    print(f"[AgentManager] Messages saved to session {session_id}")
+                except Exception as e:
+                    print(f"[AgentManager] Failed to save messages: {e}")
+                
                 return final_answer
             else:
-                error_msg = "Agent finished but no final answer found."
-                self.logger.status(error_msg, message_id)
-                return "No response generated"
+                # Agent returned empty response - send error to unlock UI
+                error_msg = "I apologize, but I couldn't generate a response. Please try rephrasing your question or try again."
+                self.logger.error(error_msg, message_id)
+                print(f"[AgentManager] Empty response detected - sending error to unlock UI")
+                return error_msg
                 
         except Exception as e:
             error_msg = f"An error occurred during agent execution: {e}"
@@ -206,9 +232,22 @@ class AgentManager:
                             tool_calls = getattr(last_message, 'tool_calls', None)
                             if not tool_calls or len(tool_calls) == 0:
                                 if hasattr(last_message, 'content') and last_message.content:
-                                    final_answer = str(last_message.content)
-                                    response_sent = True
-                                    break  # Exit immediately
+                                    content = last_message.content
+                                    
+                                    # Handle Gemini's list of content objects
+                                    if isinstance(content, list):
+                                        print(f"[AgentManager] Parsing list content: {len(content)} items")
+                                        text_parts = []
+                                        for item in content:
+                                            if isinstance(item, dict) and item.get('type') == 'text':
+                                                text_parts.append(item.get('text', ''))
+                                        final_answer = ' '.join(text_parts).strip()
+                                    else:
+                                        final_answer = str(content)
+                                    
+                                    if final_answer:
+                                        response_sent = True
+                                        break  # Exit immediately
                 
                 # Log tool executions if needed
                 if "tools" in step:
