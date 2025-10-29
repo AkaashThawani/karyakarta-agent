@@ -447,11 +447,34 @@ class MultiAgentManager(AgentManager):
     def _register_tools(self) -> None:
         """Register all tools in the registry with metadata."""
         tool_categories = {
+            # Search tools
             "google_search": ToolCategory.SEARCH,
+            "search": ToolCategory.SEARCH,
+            
+            # Scraping tools
             "browse_website": ToolCategory.SCRAPING,
             "scraper": ToolCategory.SCRAPING,
-            "calculator": ToolCategory.CALCULATION,
+            "browse_and_wait": ToolCategory.SCRAPING,
+            "browse_with_scroll": ToolCategory.SCRAPING,
+            "browse_with_click": ToolCategory.SCRAPING,
+            "browse_with_form": ToolCategory.SCRAPING,
+            "browse_with_auth": ToolCategory.SCRAPING,
+            "browse_multi_page": ToolCategory.SCRAPING,
+            
+            # Data processing tools
             "extract_data": ToolCategory.DATA_PROCESSING,
+            "extract_structured": ToolCategory.DATA_PROCESSING,
+            "extract_table": ToolCategory.DATA_PROCESSING,
+            "extract_links": ToolCategory.DATA_PROCESSING,
+            "extract_images": ToolCategory.DATA_PROCESSING,
+            "extract_text_blocks": ToolCategory.DATA_PROCESSING,
+            "analyze_sentiment": ToolCategory.DATA_PROCESSING,
+            "summarize_content": ToolCategory.DATA_PROCESSING,
+            "compare_data": ToolCategory.DATA_PROCESSING,
+            "validate_data": ToolCategory.DATA_PROCESSING,
+            
+            # Calculation tools
+            "calculator": ToolCategory.CALCULATION,
         }
         
         for tool in self.tools:
@@ -462,14 +485,27 @@ class MultiAgentManager(AgentManager):
                     category = cat
                     break
             
-            # Register with default metadata
+            # Determine cost level based on tool type
+            cost = CostLevel.FREE
+            if "browse" in tool.name.lower() or "extract" in tool.name.lower():
+                # Playwright-based tools may have higher costs
+                cost = CostLevel.LOW
+            
+            # Determine average latency based on tool type
+            avg_latency = 1.0
+            if "browse" in tool.name.lower():
+                avg_latency = 3.0  # Browser operations are slower
+            elif "analyze" in tool.name.lower() or "summarize" in tool.name.lower():
+                avg_latency = 2.0  # LLM-based tools need more time
+            
+            # Register with metadata
             self.registry.register(
                 name=tool.name,
                 description=tool.description,
                 capabilities={tool.name, category.value},
                 category=category,
-                cost=CostLevel.FREE,
-                avg_latency=1.0,
+                cost=cost,
+                avg_latency=avg_latency,
                 reliability=95.0
             )
     

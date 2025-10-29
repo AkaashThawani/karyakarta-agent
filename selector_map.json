@@ -1,0 +1,49 @@
+{
+  "search_input": [
+    "input[placeholder*='search' i]",
+    "input[name='search_query']",
+    "input[name='q']",
+    "textarea[name='q']",
+    "input[data-testid='search-input']",
+    "input[aria-label*='search' i]",
+    "input[type='search']",
+    "input[name*='search' i]"
+  ],
+  "login_button": [
+    "button[data-testid='login-button']",
+    "button:has-text('Log in')",
+    "button:has-text('Sign in')",
+    "a:has-text('Log in')",
+    "a:has-text('Sign in')",
+    "button[aria-label*='login' i]",
+    "a[href*='login']"
+  ],
+  "submit_button": [
+    "button:has-text('Submit')",
+    "button[type='submit']",
+    "input[type='submit']",
+    "button:has-text('Go')",
+    "button:has-text('Search')"
+  ],
+  "email_field": [
+    "input[type='email']",
+    "input[name='email']",
+    "input[name*='email' i]",
+    "input[placeholder*='email' i]",
+    "input[aria-label*='email' i]"
+  ],
+  "password_field": [
+    "input[type='password']",
+    "input[name='password']",
+    "input[name*='password' i]",
+    "input[placeholder*='password' i]",
+    "input[aria-label*='password' i]"
+  ],
+  "username_field": [
+    "input[name='username']",
+    "input[name='user']",
+    "input[name*='username' i]",
+    "input[placeholder*='username' i]",
+    "input[aria-label*='username' i]"
+  ]
+}

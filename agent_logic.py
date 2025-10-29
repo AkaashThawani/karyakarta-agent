@@ -37,6 +37,7 @@ from src.tools.browse_forms import (
 from src.tools.analysis_tools import (
     AnalyzeSentimentTool, SummarizeContentTool, CompareDataTool, ValidateDataTool
 )
+from src.tools.playwright_universal import UniversalPlaywrightTool
 
 load_dotenv()
 
@@ -128,6 +129,9 @@ def create_tools_for_session(session_id: str):
     compare_data_tool = CompareDataTool(session_id, logger, settings)
     validate_data_tool = ValidateDataTool(session_id, logger, settings)
     
+    # Initialize Universal Playwright Tool
+    universal_playwright_tool = UniversalPlaywrightTool(session_id, logger, settings)
+    
     # Create list of all tools
     all_tools = [
         # Base tools
@@ -153,7 +157,9 @@ def create_tools_for_session(session_id: str):
         analyze_sentiment_tool,
         summarize_content_tool,
         compare_data_tool,
-        validate_data_tool
+        validate_data_tool,
+        # Universal Playwright Tool (dynamic method execution)
+        universal_playwright_tool
     ]
     
     # Initialize list_tools meta-tool

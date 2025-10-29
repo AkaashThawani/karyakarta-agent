@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # API Keys (Required)
     google_api_key: str
     serper_api_key: str
-    browserless_api_key: str
+    browserless_api_key: Optional[str] = None  # Optional for local browser usage
     
     # LLM Settings
     llm_model: str = "gemini-2.5-flash"  # Changed from lite version for better reliability
@@ -45,4 +45,4 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings()
+settings = Settings() # type: ignore

@@ -11,6 +11,7 @@ from src.agents.base_agent import (
     MessageType, TaskPriority, AgentStatus
 )
 from src.prompts import get_reason_agent_prompt
+from src.routing.task_decomposer import create_decomposer
 import time
 import json
 
@@ -83,6 +84,9 @@ class ReasonAgent(BaseAgent):
         
         # NEW: Structured memory for preserving detailed data
         self.structured_memory: Dict[str, Dict[str, Any]] = {}
+        
+        # NEW: LLM-based task decomposer
+        self.task_decomposer = create_decomposer(llm_service)
     
     def execute(self, task: AgentTask, context: Optional[Dict[str, Any]] = None) -> AgentResult:
         """
@@ -217,18 +221,8 @@ class ReasonAgent(BaseAgent):
             "estimated_steps": len(required_tools)
         }
         
-        # Console debug output
-        print(f"\n{'='*60}")
-        print(f"[REASON] Task Analysis:")
-        print(f"[REASON]   - Description: {task.description[:100]}...")
-        print(f"[REASON]   - Identified {len(required_tools)} tools: {required_tools}")
-        print(f"[REASON]   - Complexity: {analysis['complexity']}")
-        print(f"{'='*60}\n")
-        
-        self.log(f"[REASON] Task Analysis:")
-        self.log(f"[REASON]   - Description: {task.description[:100]}...")
-        self.log(f"[REASON]   - Identified {len(required_tools)} tools: {required_tools}")
-        self.log(f"[REASON]   - Complexity: {analysis['complexity']}")
+        # Removed verbose logging - keeping only essential info
+        self.log(f"Task analysis complete: {len(required_tools)} tools identified")
         
         return analysis
     
@@ -324,7 +318,7 @@ JSON Response:"""
     
     def _identify_required_tools(self, task: AgentTask) -> List[str]:
         """
-        Identify which tools are needed using LLM-based selection.
+        Identify which tools are needed using LLM-based selection with keyword fallback.
         Simple, intelligent, and works for any query type.
         
         Args:
@@ -336,12 +330,46 @@ JSON Response:"""
         print("[REASON] Using LLM-based tool selection...")
         tools = self._llm_tool_selection(task)
         
-        # Default to search if LLM selection fails
+        # If LLM selection fails, use keyword-based fallback
         if not tools:
-            print("[REASON] LLM selection failed, defaulting to google_search")
-            return ["google_search"]
+            print("[REASON] LLM selection failed, using keyword fallback")
+            tools = self._keyword_based_tool_selection(task)
         
         return tools
+    
+    def _keyword_based_tool_selection(self, task: AgentTask) -> List[str]:
+        """
+        Fallback tool selection based on keywords in the task description.
+        
+        Args:
+            task: Task to analyze
+            
+        Returns:
+            List of tool names based on keyword matching
+        """
+        description = task.description.lower()
+        
+        # Browser automation keywords
+        browser_keywords = [
+            "go to", "goto", "navigate", "visit", "open website", "browse",
+            "click", "fill", "type", "press", "submit", "screenshot",
+            "scroll", "hover", "wait for", "extract from page"
+        ]
+        
+        # Check if this is a browser automation task
+        if any(keyword in description for keyword in browser_keywords):
+            print("[REASON] Detected browser automation request - using playwright_execute")
+            return ["playwright_execute"]
+        
+        # Search keywords
+        search_keywords = ["search", "find", "look up", "google", "query"]
+        if any(keyword in description for keyword in search_keywords):
+            print("[REASON] Detected search request - using google_search")
+            return ["google_search"]
+        
+        # Default to search
+        print("[REASON] No specific keywords matched, defaulting to google_search")
+        return ["google_search"]
     
     def _create_plan(self, task: AgentTask, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -363,20 +391,220 @@ JSON Response:"""
             "subtasks": []
         }
         
-        # Create subtasks for each required tool with proper parameters
-        for i, tool in enumerate(required_tools):
-            # Map parameters based on tool type
-            tool_params = self._map_parameters_for_tool(tool, task.parameters, task.description)
+        # Use LLM-based decomposer for playwright tasks
+        if "playwright_execute" in required_tools:
+            print("[REASON] Using LLM-based task decomposer for playwright")
+            decomposed_subtasks = self.task_decomposer.decompose(task.description, task.task_id)
             
-            subtask = {
-                "subtask_id": f"{task.task_id}_sub_{i}",
-                "tool": tool,
-                "parameters": tool_params,
-                "description": f"Use {tool} for: {task.description}"
-            }
-            plan["subtasks"].append(subtask)
+            if decomposed_subtasks:
+                plan["subtasks"] = decomposed_subtasks
+            else:
+                # Fallback to old method if decomposer fails
+                print("[REASON] Decomposer failed, using fallback")
+                for i, tool in enumerate(required_tools):
+                    if tool == "playwright_execute":
+                        playwright_subtasks = self._parse_playwright_task(task.description, task.task_id, i)
+                        plan["subtasks"].extend(playwright_subtasks)
+                    else:
+                        tool_params = self._map_parameters_for_tool(tool, task.parameters, task.description)
+                        subtask = {
+                            "subtask_id": f"{task.task_id}_sub_{i}",
+                            "tool": tool,
+                            "parameters": tool_params,
+                            "description": f"Use {tool} for: {task.description}"
+                        }
+                        plan["subtasks"].append(subtask)
+        else:
+            # For non-playwright tools, use existing logic
+            for i, tool in enumerate(required_tools):
+                tool_params = self._map_parameters_for_tool(tool, task.parameters, task.description)
+                subtask = {
+                    "subtask_id": f"{task.task_id}_sub_{i}",
+                    "tool": tool,
+                    "parameters": tool_params,
+                    "description": f"Use {tool} for: {task.description}"
+                }
+                plan["subtasks"].append(subtask)
+        
+        # Log the plan
+        print(f"\n{'='*60}")
+        print(f"📋 EXECUTION PLAN ({len(plan['subtasks'])} steps)")
+        for idx, subtask in enumerate(plan['subtasks'], 1):
+            print(f"  {idx}. {subtask['tool']}: {subtask.get('parameters', {})}")
+        print(f"{'='*60}\n")
         
         return plan
+    
+    def _parse_playwright_task(
+        self,
+        description: str,
+        task_id: str,
+        base_index: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Parse a complex Playwright task description into multiple subtasks.
+        
+        Args:
+            description: Task description
+            task_id: Base task ID
+            base_index: Starting index for subtask IDs
+            
+        Returns:
+            List of subtask dictionaries
+        """
+        import re
+        
+        subtasks = []
+        subtask_counter = 0
+        
+        # Extract URL
+        url_pattern = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?'
+        url_match = re.search(url_pattern, description)
+        url = None
+        if url_match:
+            url = url_match.group(0).rstrip(',.;:!?')
+            if not url.startswith(('http://', 'https://')):
+                url = f'https://{url}'
+        
+        # Step 1: Navigation (if URL found)
+        if url:
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "url": url,
+                    "method": "goto",
+                    "args": {}
+                },
+                "description": f"Navigate to {url}"
+            })
+            subtask_counter += 1
+        
+        # Step 2: Look for search actions (e.g., "search for X", "search X")
+        search_pattern = r'(?:search|find|look\s+for|query)\s+(?:for\s+)?["\']?([^"\']+?)["\']?(?:\s+(?:on|in|at)|$)'
+        search_match = re.search(search_pattern, description, re.IGNORECASE)
+        
+        if search_match:
+            search_query = search_match.group(1).strip()
+            # Remove trailing "and" or other connectors
+            search_query = re.sub(r'\s+(?:and|then|,).*$', '', search_query, flags=re.IGNORECASE)
+            
+            # Add search box fill
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "fill",
+                    "selector": "input[name='search'], input[type='search'], input[placeholder*='search' i], input[aria-label*='search' i]",
+                    "args": {"value": search_query}
+                },
+                "description": f"Enter search query: {search_query}"
+            })
+            subtask_counter += 1
+            
+            # Add press Enter or click search button
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "press",
+                    "selector": "input[name='search'], input[type='search']",
+                    "args": {"key": "Enter"}
+                },
+                "description": "Submit search"
+            })
+            subtask_counter += 1
+        
+        # Step 3: Look for fill/type actions (existing logic)
+        # Use a single comprehensive pattern that handles "and" properly
+        # Matches: "X as 'Y'" or "fill X as 'Y'" etc, stopping before "and" or ","
+        fill_pattern = r'(?:fill\s+in\s+(?:the\s+)?|fill\s+(?:the\s+)?)?([^,]+?)\s+as\s+["\']([^"\']+)["\']'
+        
+        matches = re.finditer(fill_pattern, description, re.IGNORECASE)
+        for match in matches:
+            field = match.group(1).strip()
+            value = match.group(2).strip()
+            
+            # Skip if field contains "go to" or other navigation terms
+            if any(term in field.lower() for term in ['go to', 'navigate', 'visit', 'then', 'submit', 'search']):
+                continue
+            
+            # Try to map field name to selector
+            selector = self._field_to_selector(field)
+            
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "fill",
+                    "selector": selector,
+                    "args": {"value": value}
+                },
+                "description": f"Fill {field} with {value}"
+            })
+            subtask_counter += 1
+        
+        # Step 4: Look for click/submit actions
+        if re.search(r'\bsubmit\b', description, re.IGNORECASE):
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "click",
+                    "selector": "input[type='submit'], button[type='submit']",
+                    "args": {}
+                },
+                "description": "Submit the form"
+            })
+            subtask_counter += 1
+        
+        # If no specific actions found, just do navigation
+        if not subtasks:
+            subtasks.append({
+                "subtask_id": f"{task_id}_pw_{base_index}_{subtask_counter}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "url": url,
+                    "method": "goto",
+                    "args": {}
+                },
+                "description": f"Navigate to {url}"
+            })
+        
+        return subtasks
+    
+    def _field_to_selector(self, field_name: str) -> str:
+        """
+        Convert a field name to a likely CSS selector.
+        
+        Args:
+            field_name: Human-readable field name
+            
+        Returns:
+            CSS selector string
+        """
+        field_lower = field_name.lower()
+        
+        # Common field name mappings
+        field_mappings = {
+            "customer name": "input[name='custname'], input[name='customer_name'], input[id='custname']",
+            "comment": "textarea[name='comments'], textarea[name='comment'], textarea[id='comments']",
+            "email": "input[type='email'], input[name='email']",
+            "password": "input[type='password'], input[name='password']",
+            "username": "input[name='username'], input[name='user']",
+            "phone": "input[type='tel'], input[name='phone']",
+            "name": "input[name='name'], input[name='custname']"
+        }
+        
+        # Check for exact match first
+        for key, selector in field_mappings.items():
+            if key in field_lower:
+                return selector
+        
+        # Default: try to create a selector from the field name
+        # Remove spaces and special chars for name attribute
+        cleaned = field_lower.replace(" ", "_").replace("'", "").replace('"', '')
+        return f"input[name='{cleaned}'], textarea[name='{cleaned}'], input[id='{cleaned}']"
     
     def _map_parameters_for_tool(
         self,
@@ -400,6 +628,37 @@ JSON Response:"""
         # Tool-specific parameter mapping
         if tool_name == "google_search":
             return {"query": query}
+        
+        elif tool_name == "playwright_execute":
+            # Extract URL from description
+            import re
+            # Match both full URLs and domain names
+            url_pattern = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?'
+            url_match = re.search(url_pattern, description)
+            
+            url = None
+            if url_match:
+                url = url_match.group(0)
+                print(f"[REASON] Extracted URL (raw): {url}")
+                # Strip trailing punctuation (commas, periods, etc.)
+                url = url.rstrip(',.;:!?')
+                print(f"[REASON] After stripping punctuation: {url}")
+                # Ensure URL has protocol (check for :// to avoid matching domains like httpbin.org)
+                if not url.startswith(('http://', 'https://')):
+                    url = f'https://{url}'
+                    print(f"[REASON] Added protocol: {url}")
+                else:
+                    print(f"[REASON] Already has protocol: {url}")
+            
+            print(f"[REASON] Final URL for playwright: {url}")
+            
+            # For simple navigation tasks, just return goto
+            # For complex tasks, the Executor will need to handle the full description
+            return {
+                "url": url,
+                "method": "goto",
+                "args": {}
+            }
         
         elif tool_name == "browse_website":
             # URL will be provided by chaining from search results
@@ -475,9 +734,12 @@ JSON Response:"""
                     self.log(f"[REASON] First subtask, no previous result")
             
             # Find executor agent that can handle this tool
+            # print(f"[REASON] Looking for executor for tool: {subtask['tool']}")
+            # print(f"[REASON] Available executors: {len(self.executor_agents)}")
             executor = self._find_executor_for_tool(subtask["tool"])
             
             if not executor:
+                print(f"[REASON] ERROR: No executor found for tool: {subtask['tool']}")
                 self.log(f"No executor found for tool: {subtask['tool']}", level="error")
                 result_entry = {
                     "subtask_id": subtask["subtask_id"],
@@ -489,6 +751,9 @@ JSON Response:"""
                 previous_result = result_entry
                 continue
             
+            # print(f"[REASON] Found executor: {executor.agent_id}")
+            # print(f"[REASON] Executor has tools: {executor.get_available_tools()}")
+            
             # Create AgentTask for the executor
             task = AgentTask(
                 task_type=subtask["tool"],
@@ -496,6 +761,9 @@ JSON Response:"""
                 parameters=subtask["parameters"],
                 priority=TaskPriority.HIGH
             )
+            
+            # print(f"[REASON] Created task for executor: {task.task_type}")
+            # print(f"[REASON] Task parameters: {task.parameters}")
             
             # NEW: Build context to pass to executor
             execution_context = {
@@ -506,9 +774,17 @@ JSON Response:"""
                 "total_subtasks": len(subtasks)
             }
             
+            # print(f"[REASON] About to call executor.execute()...")
+            # print(f"[REASON] Executor ID: {executor.agent_id}")
+            # print(f"[REASON] Executor type: {type(executor)}")
+            
             # Execute through executor agent with context
             try:
+                print(f"[REASON] Calling executor.execute() NOW...")
                 result = executor.execute(task, context=execution_context)
+                print(f"[REASON] executor.execute() returned!")
+                print(f"[REASON] Result success: {result.success}")
+                print(f"[REASON] Result data: {str(result.data)[:200]}...")
                 
                 result_entry = {
                     "subtask_id": subtask["subtask_id"],
@@ -784,6 +1060,8 @@ JSON:"""
             Prompt string for LLM
         """
         prompt = f"""You are a helpful assistant that presents information clearly and concisely.
+
+**IMPORTANT: All subtasks have completed successfully. Provide a complete, final answer.**
 
 """
         

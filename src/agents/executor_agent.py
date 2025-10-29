@@ -91,19 +91,29 @@ class ExecutorAgent(BaseAgent):
         """
         start_time = time.time()
         self.state.update_status(AgentStatus.EXECUTING)
+        # print(f"[EXECUTOR] Starting execution of task: {task.task_type}")
+        # print(f"[EXECUTOR] Task parameters: {task.parameters}")
         self.log(f"Executor agent executing task: {task.task_type}")
         
         try:
             # Find appropriate tool
+            print(f"[EXECUTOR] Finding tool for task type: {task.task_type}")
             tool = self._find_tool_for_task(task)
             
             if not tool:
+                print(f"[EXECUTOR] ERROR: No tool found for: {task.task_type}")
                 raise ValueError(f"No tool found for task type: {task.task_type}")
             
+            print(f"[EXECUTOR] Found tool: {tool.name}")
+            print(f"[EXECUTOR] Tool type: {type(tool)}")
             self.log(f"Using tool: {tool.name}")
             
             # Execute tool with retry logic
+            print(f"[EXECUTOR] Calling tool.execute() with parameters: {task.parameters}")
             tool_result = self._execute_with_retry(tool, task.parameters)
+            print(f"[EXECUTOR] Tool returned - Success: {tool_result.success}")
+            print(f"[EXECUTOR] Tool result type: {type(tool_result.data)}")
+            print(f"[EXECUTOR] Tool result data: {str(tool_result.data)[:300]}...")
             
             # Update stats
             self._update_stats(tool.name, tool_result.success)
@@ -203,7 +213,8 @@ class ExecutorAgent(BaseAgent):
                     return result
                 else:
                     last_error = result.error
-                    self.log(f"Tool execution failed: {result.error}", level="error")
+                    # Don't log errors during retries - only final failure
+                    # self.log(f"Tool execution failed: {result.error}", level="error")
                     
                     # Don't retry if it's a validation error
                     if "validation" in str(result.error).lower():
@@ -211,7 +222,8 @@ class ExecutorAgent(BaseAgent):
                     
             except Exception as e:
                 last_error = str(e)
-                self.log(f"Exception during tool execution: {e}", level="error")
+                # Don't log errors during retries - only log final failure
+                # self.log(f"Exception during tool execution: {e}", level="error")
                 
                 # Don't retry on certain exceptions
                 if isinstance(e, (ValueError, TypeError)):

@@ -1,0 +1,818 @@
+{
+  "playwright_goto": {
+    "tool": "playwright_execute",
+    "method": "goto",
+    "description": "Playwright Page.goto() - Browser automation",
+    "actions": [
+      "goto"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "navigate",
+      "go to",
+      "visit",
+      "open page",
+      "browse to"
+    ],
+    "requires_selector": false
+  },
+  "playwright_click": {
+    "tool": "playwright_execute",
+    "method": "click",
+    "description": "Playwright Page.click() - Browser automation",
+    "actions": [
+      "click"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "click",
+      "press button",
+      "select",
+      "tap on",
+      "hit"
+    ],
+    "requires_selector": true
+  },
+  "playwright_fill": {
+    "tool": "playwright_execute",
+    "method": "fill",
+    "description": "Playwright Page.fill() - Browser automation",
+    "actions": [
+      "fill"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "type",
+      "enter text",
+      "fill",
+      "write",
+      "input"
+    ],
+    "requires_selector": true
+  },
+  "playwright_press": {
+    "tool": "playwright_execute",
+    "method": "press",
+    "description": "Playwright Page.press() - Browser automation",
+    "actions": [
+      "press"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "press key",
+      "hit enter",
+      "keyboard",
+      "key press"
+    ],
+    "requires_selector": true
+  },
+  "playwright_hover": {
+    "tool": "playwright_execute",
+    "method": "hover",
+    "description": "Playwright Page.hover() - Browser automation",
+    "actions": [
+      "hover"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "hover",
+      "mouse over",
+      "mouseover"
+    ],
+    "requires_selector": true
+  },
+  "playwright_check": {
+    "tool": "playwright_execute",
+    "method": "check",
+    "description": "Playwright Page.check() - Browser automation",
+    "actions": [
+      "check"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "check",
+      "tick",
+      "select checkbox",
+      "mark"
+    ],
+    "requires_selector": true
+  },
+  "playwright_uncheck": {
+    "tool": "playwright_execute",
+    "method": "uncheck",
+    "description": "Playwright Page.uncheck() - Browser automation",
+    "actions": [
+      "uncheck"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "uncheck",
+      "untick",
+      "deselect checkbox",
+      "unmark"
+    ],
+    "requires_selector": true
+  },
+  "playwright_select_option": {
+    "tool": "playwright_execute",
+    "method": "select_option",
+    "description": "Playwright Page.select_option() - Browser automation",
+    "actions": [
+      "select_option"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "select",
+      "choose from dropdown",
+      "pick option",
+      "select from"
+    ],
+    "requires_selector": true
+  },
+  "playwright_screenshot": {
+    "tool": "playwright_execute",
+    "method": "screenshot",
+    "description": "Playwright Page.screenshot() - Browser automation",
+    "actions": [
+      "screenshot"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "screenshot",
+      "capture",
+      "take picture",
+      "snap"
+    ],
+    "requires_selector": false
+  },
+  "playwright_inner_text": {
+    "tool": "playwright_execute",
+    "method": "inner_text",
+    "description": "Playwright Page.inner_text() - Browser automation",
+    "actions": [
+      "inner_text"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "get text",
+      "read text",
+      "inner text",
+      "text of"
+    ],
+    "requires_selector": true
+  },
+  "playwright_inner_html": {
+    "tool": "playwright_execute",
+    "method": "inner_html",
+    "description": "Playwright Page.inner_html() - Browser automation",
+    "actions": [
+      "inner_html"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "get html",
+      "read html",
+      "inner html"
+    ],
+    "requires_selector": true
+  },
+  "playwright_text_content": {
+    "tool": "playwright_execute",
+    "method": "text_content",
+    "description": "Playwright Page.text_content() - Browser automation",
+    "actions": [
+      "text_content"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "get content",
+      "read text content",
+      "text content"
+    ],
+    "requires_selector": true
+  },
+  "playwright_get_attribute": {
+    "tool": "playwright_execute",
+    "method": "get_attribute",
+    "description": "Playwright Page.get_attribute() - Browser automation",
+    "actions": [
+      "get_attribute"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "get attribute",
+      "read attribute",
+      "attribute of"
+    ],
+    "requires_selector": true
+  },
+  "playwright_wait_for_selector": {
+    "tool": "playwright_execute",
+    "method": "wait_for_selector",
+    "description": "Playwright Page.wait_for_selector() - Browser automation",
+    "actions": [
+      "wait_for_selector"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "wait for element",
+      "wait for selector",
+      "wait until"
+    ],
+    "requires_selector": true
+  },
+  "playwright_wait_for_load_state": {
+    "tool": "playwright_execute",
+    "method": "wait_for_load_state",
+    "description": "Playwright Page.wait_for_load_state() - Browser automation",
+    "actions": [
+      "wait_for_load_state"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "wait for load",
+      "wait for page",
+      "wait until loaded"
+    ],
+    "requires_selector": false
+  },
+  "playwright_wait_for_timeout": {
+    "tool": "playwright_execute",
+    "method": "wait_for_timeout",
+    "description": "Playwright Page.wait_for_timeout() - Browser automation",
+    "actions": [
+      "wait_for_timeout"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "wait",
+      "pause",
+      "delay",
+      "sleep"
+    ],
+    "requires_selector": false
+  },
+  "playwright_evaluate": {
+    "tool": "playwright_execute",
+    "method": "evaluate",
+    "description": "Playwright Page.evaluate() - Browser automation",
+    "actions": [
+      "evaluate"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "execute javascript",
+      "run script",
+      "evaluate",
+      "run js"
+    ],
+    "requires_selector": false
+  },
+  "playwright_evaluate_handle": {
+    "tool": "playwright_execute",
+    "method": "evaluate_handle",
+    "description": "Playwright Page.evaluate_handle() - Browser automation",
+    "actions": [
+      "evaluate_handle"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "execute javascript",
+      "get handle",
+      "js handle"
+    ],
+    "requires_selector": true
+  },
+  "playwright_content": {
+    "tool": "playwright_execute",
+    "method": "content",
+    "description": "Playwright Page.content() - Browser automation",
+    "actions": [
+      "content"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "get html",
+      "page content",
+      "full html"
+    ],
+    "requires_selector": false
+  },
+  "playwright_query_selector": {
+    "tool": "playwright_execute",
+    "method": "query_selector",
+    "description": "Playwright Page.query_selector() - Browser automation",
+    "actions": [
+      "query_selector"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "find element",
+      "select element",
+      "get element"
+    ],
+    "requires_selector": true
+  },
+  "playwright_query_selector_all": {
+    "tool": "playwright_execute",
+    "method": "query_selector_all",
+    "description": "Playwright Page.query_selector_all() - Browser automation",
+    "actions": [
+      "query_selector_all"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "find all elements",
+      "select all",
+      "get all elements"
+    ],
+    "requires_selector": true
+  },
+  "playwright_dispatch_event": {
+    "tool": "playwright_execute",
+    "method": "dispatch_event",
+    "description": "Playwright Page.dispatch_event() - Browser automation",
+    "actions": [
+      "dispatch_event"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "trigger event",
+      "dispatch event",
+      "fire event"
+    ],
+    "requires_selector": true
+  },
+  "playwright_focus": {
+    "tool": "playwright_execute",
+    "method": "focus",
+    "description": "Playwright Page.focus() - Browser automation",
+    "actions": [
+      "focus"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "focus",
+      "focus element",
+      "set focus"
+    ],
+    "requires_selector": true
+  },
+  "playwright_is_visible": {
+    "tool": "playwright_execute",
+    "method": "is_visible",
+    "description": "Playwright Page.is_visible() - Browser automation",
+    "actions": [
+      "is_visible"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "is visible",
+      "check visibility",
+      "visible"
+    ],
+    "requires_selector": true
+  },
+  "playwright_is_hidden": {
+    "tool": "playwright_execute",
+    "method": "is_hidden",
+    "description": "Playwright Page.is_hidden() - Browser automation",
+    "actions": [
+      "is_hidden"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "is hidden",
+      "check hidden",
+      "hidden"
+    ],
+    "requires_selector": true
+  },
+  "playwright_is_enabled": {
+    "tool": "playwright_execute",
+    "method": "is_enabled",
+    "description": "Playwright Page.is_enabled() - Browser automation",
+    "actions": [
+      "is_enabled"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "is enabled",
+      "check enabled",
+      "enabled"
+    ],
+    "requires_selector": true
+  },
+  "playwright_is_disabled": {
+    "tool": "playwright_execute",
+    "method": "is_disabled",
+    "description": "Playwright Page.is_disabled() - Browser automation",
+    "actions": [
+      "is_disabled"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "is disabled",
+      "check disabled",
+      "disabled"
+    ],
+    "requires_selector": true
+  },
+  "playwright_is_checked": {
+    "tool": "playwright_execute",
+    "method": "is_checked",
+    "description": "Playwright Page.is_checked() - Browser automation",
+    "actions": [
+      "is_checked"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "is checked",
+      "checkbox status",
+      "checked"
+    ],
+    "requires_selector": true
+  },
+  "playwright_set_input_files": {
+    "tool": "playwright_execute",
+    "method": "set_input_files",
+    "description": "Playwright Page.set_input_files() - Browser automation",
+    "actions": [
+      "set_input_files"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "upload file",
+      "set files",
+      "attach file"
+    ],
+    "requires_selector": true
+  },
+  "playwright_dblclick": {
+    "tool": "playwright_execute",
+    "method": "dblclick",
+    "description": "Playwright Page.dblclick() - Browser automation",
+    "actions": [
+      "dblclick"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "double click",
+      "dblclick",
+      "double tap"
+    ],
+    "requires_selector": true
+  },
+  "playwright_tap": {
+    "tool": "playwright_execute",
+    "method": "tap",
+    "description": "Playwright Page.tap() - Browser automation",
+    "actions": [
+      "tap"
+    ],
+    "selector_hints": [
+      "id",
+      "class",
+      "name",
+      "placeholder",
+      "type",
+      "aria-label",
+      "data-*"
+    ],
+    "keywords": [
+      "tap",
+      "touch tap",
+      "mobile tap"
+    ],
+    "requires_selector": true
+  },
+  "playwright_reload": {
+    "tool": "playwright_execute",
+    "method": "reload",
+    "description": "Playwright Page.reload() - Browser automation",
+    "actions": [
+      "reload"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "reload",
+      "refresh",
+      "refresh page"
+    ],
+    "requires_selector": false
+  },
+  "playwright_go_back": {
+    "tool": "playwright_execute",
+    "method": "go_back",
+    "description": "Playwright Page.go_back() - Browser automation",
+    "actions": [
+      "go_back"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "go back",
+      "back",
+      "navigate back"
+    ],
+    "requires_selector": false
+  },
+  "playwright_go_forward": {
+    "tool": "playwright_execute",
+    "method": "go_forward",
+    "description": "Playwright Page.go_forward() - Browser automation",
+    "actions": [
+      "go_forward"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "go forward",
+      "forward",
+      "navigate forward"
+    ],
+    "requires_selector": false
+  },
+  "google_search": {
+    "tool": "google_search",
+    "method": "query",
+    "description": "Search the web using Google",
+    "actions": [
+      "query",
+      "search"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "search",
+      "google",
+      "find",
+      "lookup",
+      "query",
+      "look up"
+    ],
+    "requires_selector": false,
+    "parameters": {
+      "query": "string - Search query (required)"
+    }
+  },
+  "browse_website": {
+    "tool": "browse_website",
+    "method": "scrape",
+    "description": "Scrape content from a website",
+    "actions": [
+      "scrape",
+      "fetch"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "browse",
+      "scrape",
+      "fetch",
+      "get content from",
+      "visit"
+    ],
+    "requires_selector": false,
+    "parameters": {
+      "url": "string - URL to browse (required)"
+    }
+  },
+  "calculator": {
+    "tool": "calculator",
+    "method": "calculate",
+    "description": "Perform mathematical calculations",
+    "actions": [
+      "calculate",
+      "compute"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "calculate",
+      "compute",
+      "math",
+      "add",
+      "subtract",
+      "multiply",
+      "divide"
+    ],
+    "requires_selector": false,
+    "parameters": {
+      "expression": "string - Mathematical expression (required)"
+    }
+  },
+  "extract_data": {
+    "tool": "extract_data",
+    "method": "extract",
+    "description": "Extract structured data from HTML",
+    "actions": [
+      "extract",
+      "parse"
+    ],
+    "selector_hints": [
+      "css",
+      "xpath"
+    ],
+    "keywords": [
+      "extract",
+      "scrape",
+      "parse",
+      "get data",
+      "read data"
+    ],
+    "requires_selector": true,
+    "parameters": {
+      "data_type": "string - Type (json/html/xml/csv/table)",
+      "content": "string - Content to extract from",
+      "path": "string - Optional selector path"
+    }
+  }
+}
