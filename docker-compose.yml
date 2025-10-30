@@ -1,0 +1,75 @@
+# Docker Compose for Local Development
+# Use this to test the Docker setup locally before deploying to GCP
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8080"
+    environment:
+      # Required API Keys
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      
+      # Optional API Keys
+      - BROWSERLESS_API_KEY=${BROWSERLESS_API_KEY:-}
+      - BROWSERLESS_ENDPOINT=${BROWSERLESS_ENDPOINT:-wss://chrome.browserless.io}
+      
+      # Supabase Configuration (for session management)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:-}
+      
+      # Application Settings
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_TOKENS=${MAX_TOKENS:-1500}
+      - ENVIRONMENT=development
+      
+      # Playwright Settings
+      - HEADLESS=${HEADLESS:-true}
+      
+      # CORS settings (update with your frontend URL)
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+      
+    volumes:
+      # Mount source for development (optional)
+      - ./src:/app/src:ro
+      - ./api:/app/api:ro
+      
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+# Optional: Add pgAdmin for Supabase database management
+# Uncomment if you need a GUI for database
+#  pgadmin:
+#    image: dpage/pgadmin4:latest
+#    ports:
+#      - "5050:80"
+#    environment:
+#      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+#      - PGADMIN_DEFAULT_PASSWORD=admin
+#    depends_on:
+#      - backend
+
+networks:
+  default:
+    name: karyakarta-network

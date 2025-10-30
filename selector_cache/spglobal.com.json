@@ -1,0 +1,130 @@
+{
+  "site_intelligence": {
+    "url": "https://www.spglobal.com/spdji/en/indices/equity/sp-500-top-10-index/",
+    "learned_at": "2025-10-30T01:52:36.290102",
+    "total_elements_found": 11,
+    "classified_elements": 11,
+    "discovered_types": [
+      {
+        "type_name": "page_containers",
+        "description": "Top-level and major section containers of the HTML document.",
+        "importance": "low",
+        "element_indices": [
+          0,
+          1,
+          2,
+          8
+        ]
+      },
+      {
+        "type_name": "primary_error_title",
+        "description": "The main heading indicating an error state on the page.",
+        "importance": "high",
+        "element_indices": [
+          4
+        ]
+      },
+      {
+        "type_name": "error_message_details",
+        "description": "Section containing the detailed explanation and contact information for the error.",
+        "importance": "high",
+        "element_indices": [
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "type_name": "branding_and_external_links",
+        "description": "Links related to the company's branding or external corporate websites.",
+        "importance": "medium",
+        "element_indices": [
+          3,
+          10
+        ]
+      },
+      {
+        "type_name": "copyright_information",
+        "description": "Legal copyright and disclaimer text.",
+        "importance": "low",
+        "element_indices": [
+          9
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "HEAD > META",
+        "count": 3,
+        "sample": {
+          "text": "",
+          "selector": "META"
+        },
+        "selectors": {
+          "first": "META:first-of-type",
+          "last": "META:last-of-type",
+          "nth": "META:nth-of-type({n})",
+          "all": "META"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html > body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "div_element": {
+        "selector": "#footer",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "link_nav": {
+        "selector": "body > div.container > div.row > div > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "h2_element": {
+        "selector": "html > body > div.container > div.page-message > h2.Geogrotesque-Regular",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h2 tag"
+      },
+      "p_element": {
+        "selector": "html > body > div.container > div.page-message > p.Geogrotesque-Regular",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "span_element": {
+        "selector": "html > body > div.container > div > span.disclaimer",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "link_s&p_global": {
+        "selector": "body > div.container > div > span.disclaimer > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

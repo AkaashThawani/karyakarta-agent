@@ -296,23 +296,34 @@ def smart_compress(html: str, max_tokens: int = 1500) -> str:
         # Fallback strategy: Get ALL visible text content
         # This ensures we never return empty even for unusual page structures
         
-        # Get all text from remaining elements
+        # Try to get body text first
+        body = soup.body if soup.body else soup
+        
+        # Get all text from body, excluding script/style tags which are already removed
         all_text = []
-        for element in main_content.find_all(text=True, recursive=True):
-            text = element.strip()
-            # Skip empty strings and very short text (likely labels/buttons)
-            if text and len(text) > 3:
-                # Skip if it's just a number or single word (likely nav/UI)
-                if len(text.split()) > 1 or len(text) > 20:
-                    all_text.append(text)
         
-        # Join with spacing and clean up
-        result = ' '.join(all_text)
-        result = re.sub(r' +', ' ', result)  # Collapse multiple spaces
-        result = re.sub(r'\n+', '\n', result)  # Collapse multiple newlines
-        result = result.strip()
-        
-        print(f"[SMART COMPRESS] Fallback extracted {len(result)} characters")
+        # Method 1: Try get_text() which is more reliable
+        body_text = body.get_text(separator=' ', strip=True)
+        if body_text and len(body_text) > 100:
+            result = body_text
+            print(f"[SMART COMPRESS] Fallback method 1 (get_text): {len(result)} characters")
+        else:
+            # Method 2: Manual extraction
+            for element in body.find_all(text=True, recursive=True):
+                text = str(element).strip()
+                # Skip empty strings and very short text (likely labels/buttons)
+                if text and len(text) > 3:
+                    # Skip if it's just a number or single word (likely nav/UI)
+                    if len(text.split()) > 1 or len(text) > 20:
+                        all_text.append(text)
+            
+            # Join with spacing and clean up
+            result = ' '.join(all_text)
+            result = re.sub(r' +', ' ', result)  # Collapse multiple spaces
+            result = re.sub(r'\n+', '\n', result)  # Collapse multiple newlines
+            result = result.strip()
+            
+            print(f"[SMART COMPRESS] Fallback method 2 (manual): {len(result)} characters")
     
     # Tokenize and truncate to exact limit
     try:

@@ -38,6 +38,7 @@ from src.tools.analysis_tools import (
     AnalyzeSentimentTool, SummarizeContentTool, CompareDataTool, ValidateDataTool
 )
 from src.tools.playwright_universal import UniversalPlaywrightTool
+from src.tools.chart_extractor_tool import ChartExtractorTool
 
 load_dotenv()
 
@@ -132,6 +133,9 @@ def create_tools_for_session(session_id: str):
     # Initialize Universal Playwright Tool
     universal_playwright_tool = UniversalPlaywrightTool(session_id, logger, settings)
     
+    # Initialize Chart Extractor Tool
+    chart_extractor_tool = ChartExtractorTool()
+    
     # Create list of all tools
     all_tools = [
         # Base tools
@@ -159,7 +163,9 @@ def create_tools_for_session(session_id: str):
         compare_data_tool,
         validate_data_tool,
         # Universal Playwright Tool (dynamic method execution)
-        universal_playwright_tool
+        universal_playwright_tool,
+        # Chart Extractor Tool (structured data extraction)
+        chart_extractor_tool
     ]
     
     # Initialize list_tools meta-tool

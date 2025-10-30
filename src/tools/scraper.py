@@ -22,6 +22,7 @@ Usage:
 
 from typing import Optional
 import time
+import random
 import requests
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
@@ -32,6 +33,47 @@ from src.services.logging_service import LoggingService
 from src.core.config import Settings
 from src.utils.helpers import compress_and_chunk_content, smart_compress
 from src.core.memory import get_memory_service
+
+
+# Anti-bot measures
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+]
+
+STEALTH_SCRIPT = """
+() => {
+    // Remove webdriver flag
+    Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined
+    });
+    
+    // Fix Chrome detection
+    window.chrome = {
+        runtime: {}
+    };
+    
+    // Fix permissions
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission }) :
+            originalQuery(parameters)
+    );
+    
+    // Add real plugins
+    Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5]
+    });
+    
+    // Fix languages
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en']
+    });
+}
+"""
 
 
 class ScraperInput(BaseModel):
@@ -176,11 +218,37 @@ class ScraperTool(BaseTool):
         print(f"\n[SCRAPER TIER 2] Trying Local Playwright Browser...")
 
         try:
+            # Random delay to avoid rate limiting (1-3 seconds)
+            delay = random.uniform(1, 3)
+            print(f"[TIER 2] Anti-bot: Waiting {delay:.1f}s...")
+            time.sleep(delay)
+            
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                page.goto(url, timeout=self.timeout,
-                          wait_until="domcontentloaded")
+                # Pick random user agent
+                user_agent = random.choice(USER_AGENTS)
+                
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
+                
+                context = browser.new_context(
+                    user_agent=user_agent,
+                    viewport={'width': 1920, 'height': 1080},
+                    locale='en-US',
+                    timezone_id='America/New_York'
+                )
+                
+                page = context.new_page()
+                
+                # Apply stealth script
+                page.add_init_script(STEALTH_SCRIPT)
+                
+                page.goto(url, timeout=self.timeout, wait_until="domcontentloaded")
                 content = page.content()
                 browser.close()
 
@@ -199,9 +267,24 @@ class ScraperTool(BaseTool):
         print(f"\n[SCRAPER TIER 3] Trying Simple HTTP Request...")
 
         try:
+            # Random delay to avoid rate limiting (0.5-2 seconds)
+            delay = random.uniform(0.5, 2)
+            print(f"[TIER 3] Anti-bot: Waiting {delay:.1f}s...")
+            time.sleep(delay)
+            
+            # Pick random user agent
+            user_agent = random.choice(USER_AGENTS)
+            
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': user_agent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
             }
+            
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
 

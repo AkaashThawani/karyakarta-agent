@@ -1,0 +1,152 @@
+{
+  "site_intelligence": {
+    "url": "https://coinmarketcap.com/",
+    "learned_at": "2025-10-30T02:02:15.574398",
+    "total_elements_found": 150,
+    "classified_elements": 0,
+    "discovered_types": [],
+    "list_structures": [
+      {
+        "pattern": "g > line",
+        "count": 575,
+        "sample": {
+          "text": "",
+          "selector": "line"
+        },
+        "selectors": {
+          "first": "line:first-of-type",
+          "last": "line:last-of-type",
+          "nth": "line:nth-of-type({n})",
+          "all": "line"
+        }
+      },
+      {
+        "pattern": "TR.sc-902a96b4-0 > TD",
+        "count": 380,
+        "sample": {
+          "text": "",
+          "selector": "TD"
+        },
+        "selectors": {
+          "first": "TD:first-of-type",
+          "last": "TD:last-of-type",
+          "nth": "TD:nth-of-type({n})",
+          "all": "TD"
+        }
+      },
+      {
+        "pattern": "TR > TD",
+        "count": 264,
+        "sample": {
+          "text": "",
+          "selector": "TD"
+        },
+        "selectors": {
+          "first": "TD:first-of-type",
+          "last": "TD:last-of-type",
+          "nth": "TD:nth-of-type({n})",
+          "all": "TD"
+        }
+      },
+      {
+        "pattern": "DIV.sc-65e7f566-0 > DIV.sc-65e7f566-0",
+        "count": 207,
+        "sample": {
+          "text": "",
+          "selector": "DIV.sc-65e7f566-0"
+        },
+        "selectors": {
+          "first": "DIV.sc-65e7f566-0:first-of-type",
+          "last": "DIV.sc-65e7f566-0:last-of-type",
+          "nth": "DIV.sc-65e7f566-0:nth-of-type({n})",
+          "all": "DIV.sc-65e7f566-0"
+        }
+      },
+      {
+        "pattern": "svg.sc-65e7f566-0 > use",
+        "count": 98,
+        "sample": {
+          "text": "",
+          "selector": "use"
+        },
+        "selectors": {
+          "first": "use:first-of-type",
+          "last": "use:last-of-type",
+          "nth": "use:nth-of-type({n})",
+          "all": "use"
+        }
+      },
+      {
+        "pattern": "TBODY > TR.sc-902a96b4-0",
+        "count": 76,
+        "sample": {
+          "text": "DaiDAI$1.00",
+          "selector": "TR.sc-902a96b4-0"
+        },
+        "selectors": {
+          "first": "TR.sc-902a96b4-0:first-of-type",
+          "last": "TR.sc-902a96b4-0:last-of-type",
+          "nth": "TR.sc-902a96b4-0:nth-of-type({n})",
+          "all": "TR.sc-902a96b4-0"
+        }
+      },
+      {
+        "pattern": "TD > A.cmc-link",
+        "count": 76,
+        "sample": {
+          "text": "DaiDAI",
+          "selector": "A.cmc-link"
+        },
+        "selectors": {
+          "first": "A.cmc-link:first-of-type",
+          "last": "A.cmc-link:last-of-type",
+          "nth": "A.cmc-link:nth-of-type({n})",
+          "all": "A.cmc-link"
+        }
+      },
+      {
+        "pattern": "A.cmc-link > SPAN.circle",
+        "count": 76,
+        "sample": {
+          "text": "",
+          "selector": "SPAN.circle"
+        },
+        "selectors": {
+          "first": "SPAN.circle:first-of-type",
+          "last": "SPAN.circle:last-of-type",
+          "nth": "SPAN.circle:nth-of-type({n})",
+          "all": "SPAN.circle"
+        }
+      },
+      {
+        "pattern": "A.cmc-link > SPAN",
+        "count": 76,
+        "sample": {
+          "text": "Dai",
+          "selector": "SPAN"
+        },
+        "selectors": {
+          "first": "SPAN:first-of-type",
+          "last": "SPAN:last-of-type",
+          "nth": "SPAN:nth-of-type({n})",
+          "all": "SPAN"
+        }
+      },
+      {
+        "pattern": "A.cmc-link > SPAN.crypto-symbol",
+        "count": 76,
+        "sample": {
+          "text": "DAI",
+          "selector": "SPAN.crypto-symbol"
+        },
+        "selectors": {
+          "first": "SPAN.crypto-symbol:first-of-type",
+          "last": "SPAN.crypto-symbol:last-of-type",
+          "nth": "SPAN.crypto-symbol:nth-of-type({n})",
+          "all": "SPAN.crypto-symbol"
+        }
+      }
+    ],
+    "elements": {}
+  }
+}

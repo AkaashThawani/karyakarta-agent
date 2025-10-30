@@ -1,0 +1,403 @@
+{
+  "site_intelligence": {
+    "url": "https://www.henleyglobal.com/passport-index/ranking",
+    "learned_at": "2025-10-30T01:44:42.777091",
+    "total_elements_found": 150,
+    "classified_elements": 100,
+    "discovered_types": [
+      {
+        "type_name": "action_buttons",
+        "description": "Clickable buttons",
+        "importance": "high",
+        "element_indices": [
+          33
+        ]
+      },
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          5,
+          6,
+          8,
+          10,
+          14,
+          19,
+          21,
+          23,
+          25,
+          27
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "SELECT.form-control > OPTION",
+        "count": 975,
+        "sample": {
+          "text": "Please select",
+          "selector": "OPTION"
+        },
+        "selectors": {
+          "first": "OPTION:first-of-type",
+          "last": "OPTION:last-of-type",
+          "nth": "OPTION:nth-of-type({n})",
+          "all": "OPTION"
+        }
+      },
+      {
+        "pattern": "DIV.row > DIV.col-3",
+        "count": 400,
+        "sample": {
+          "text": "RANK IN 2025",
+          "selector": "DIV.col-3"
+        },
+        "selectors": {
+          "first": "DIV.col-3:first-of-type",
+          "last": "DIV.col-3:last-of-type",
+          "nth": "DIV.col-3:nth-of-type({n})",
+          "all": "DIV.col-3"
+        }
+      },
+      {
+        "pattern": "DIV.col-3 > SPAN.global-rank_button__zB74X",
+        "count": 398,
+        "sample": {
+          "text": "1st",
+          "selector": "SPAN.global-rank_button__zB74X"
+        },
+        "selectors": {
+          "first": "SPAN.global-rank_button__zB74X:first-of-type",
+          "last": "SPAN.global-rank_button__zB74X:last-of-type",
+          "nth": "SPAN.global-rank_button__zB74X:nth-of-type({n})",
+          "all": "SPAN.global-rank_button__zB74X"
+        }
+      },
+      {
+        "pattern": "SPAN.global-rank_button__zB74X > SPAN.d-inline-block",
+        "count": 398,
+        "sample": {
+          "text": "1st",
+          "selector": "SPAN.d-inline-block"
+        },
+        "selectors": {
+          "first": "SPAN.d-inline-block:first-of-type",
+          "last": "SPAN.d-inline-block:last-of-type",
+          "nth": "SPAN.d-inline-block:nth-of-type({n})",
+          "all": "SPAN.d-inline-block"
+        }
+      },
+      {
+        "pattern": "UL.iti__country-list > LI.iti__country",
+        "count": 244,
+        "sample": {
+          "text": "Afghanistan+93",
+          "selector": "LI.iti__country"
+        },
+        "selectors": {
+          "first": "LI.iti__country:first-of-type",
+          "last": "LI.iti__country:last-of-type",
+          "nth": "LI.iti__country:nth-of-type({n})",
+          "all": "LI.iti__country"
+        }
+      },
+      {
+        "pattern": "LI.iti__country > DIV.iti__flag",
+        "count": 244,
+        "sample": {
+          "text": "",
+          "selector": "DIV.iti__flag"
+        },
+        "selectors": {
+          "first": "DIV.iti__flag:first-of-type",
+          "last": "DIV.iti__flag:last-of-type",
+          "nth": "DIV.iti__flag:nth-of-type({n})",
+          "all": "DIV.iti__flag"
+        }
+      },
+      {
+        "pattern": "LI.iti__country > SPAN.iti__country-name",
+        "count": 244,
+        "sample": {
+          "text": "Afghanistan",
+          "selector": "SPAN.iti__country-name"
+        },
+        "selectors": {
+          "first": "SPAN.iti__country-name:first-of-type",
+          "last": "SPAN.iti__country-name:last-of-type",
+          "nth": "SPAN.iti__country-name:nth-of-type({n})",
+          "all": "SPAN.iti__country-name"
+        }
+      },
+      {
+        "pattern": "LI.iti__country > SPAN.iti__dial-code",
+        "count": 244,
+        "sample": {
+          "text": "+93",
+          "selector": "SPAN.iti__dial-code"
+        },
+        "selectors": {
+          "first": "SPAN.iti__dial-code:first-of-type",
+          "last": "SPAN.iti__dial-code:last-of-type",
+          "nth": "SPAN.iti__dial-code:nth-of-type({n})",
+          "all": "SPAN.iti__dial-code"
+        }
+      },
+      {
+        "pattern": "DIV.row > DIV.col-6",
+        "count": 204,
+        "sample": {
+          "text": "Passport",
+          "selector": "DIV.col-6"
+        },
+        "selectors": {
+          "first": "DIV.col-6:first-of-type",
+          "last": "DIV.col-6:last-of-type",
+          "nth": "DIV.col-6:nth-of-type({n})",
+          "all": "DIV.col-6"
+        }
+      },
+      {
+        "pattern": "DIV.global-rank_list_body__8w1Ny > DIV.row",
+        "count": 199,
+        "sample": {
+          "text": "Singapore1st193",
+          "selector": "DIV.row"
+        },
+        "selectors": {
+          "first": "DIV.row:first-of-type",
+          "last": "DIV.row:last-of-type",
+          "nth": "DIV.row:nth-of-type({n})",
+          "all": "DIV.row"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html.backgroundblendmode.backgroundcliptext.flexbox.flexboxlegacy.flexwrap.mediaqueries.no-touchevents",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html.backgroundblendmode.backgroundcliptext.flexbox.flexboxlegacy.flexwrap.mediaqueries.no-touchevents > body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "div_element": {
+        "selector": "footer > div.container > div.row.row-1.justify-content-md-space-between > div.col-md-6.col-right-container > div.col-md.col-links",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "link_nav": {
+        "selector": "body > div > header.wrapper-padding > div.main-header-inner.primary-nav > a.header-logo.btn-style-none",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_callback": {
+        "selector": "body > div > div > div.align-items-center.justify-content-end.wrapper-padding > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "span_element": {
+        "selector": "div.container > div.row.row-1.justify-content-md-space-between > div.col-md-6.col-logo > p.label-alt > span.entity",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "link_+1_786_233_6668": {
+        "selector": "body > div > div > div.align-items-center.justify-content-end.wrapper-padding > a.office_number_link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_worldwide_offices": {
+        "selector": "body > div > div > div.align-items-center.justify-content-end.wrapper-padding > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "header_element": {
+        "selector": "#main-header",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: header tag"
+      },
+      "nav_element": {
+        "selector": "div > header.wrapper-padding > div.main-header-inner.primary-nav > div.menus > nav.main-nav",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: nav tag"
+      },
+      "ul_element": {
+        "selector": "div.container > div.row.row-1.justify-content-md-space-between > div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: ul tag"
+      },
+      "li_element": {
+        "selector": "div.row.row-1.justify-content-md-space-between > div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: li tag"
+      },
+      "link_citizenship": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_residence": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_real_estate": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_countries": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_services": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_about": {
+        "selector": "div.menus > nav.main-nav > ul.list-style-none.nav-menu > li > a.nav-links",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_contact": {
+        "selector": "div.col-md-6.col-right-container > div.col-md.col-links > ul.footer-menu.footer-menu-minus > li > a.footer-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "button_": {
+        "selector": "div > header.wrapper-padding > div.main-header-inner.primary-nav > div.menus > button.btn-style-none.hamburger-menu.trigger-header-menu",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "link_henley_passport_index": {
+        "selector": "div.col-md-8.col-hero-title > div.breadcrumbs-wrapper > ul.breadcrumbs > li.link-wrapper > a.breadcrumb-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_global_passport_ranking": {
+        "selector": "#global-ranking-tab",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "p_element": {
+        "selector": "footer > div.container > div.row.row-1.justify-content-md-space-between > div.col-md-6.col-logo > p.nearest_office.d-lg-block.d-none",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "link_international_air_transport_as": {
+        "selector": "div.col-md-8.col-hero-title > div.row.mb20 > div.col-lg.col-md-12 > p > a.underlined",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_my_passport": {
+        "selector": "#my-passport-tab",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_improve_my_global_mobility": {
+        "selector": "#improve-passport-tab",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_compare_my_passport": {
+        "selector": "#compare-passport-tab",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_methodology": {
+        "selector": "#about-tab",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "h2_element": {
+        "selector": "div.contact-section-wrapper.slide-in > div.container.container-contact-us > div.row.row-contact > div.col-md-4 > h2",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h2 tag"
+      },
+      "link_enquiry": {
+        "selector": "div.container.container-contact-us > div.row.row-contact > div.col-md-4 > p.btn-wrapper > a.tertiary-btn",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "footer_element": {
+        "selector": "#main-footer",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: footer tag"
+      },
+      "link_355_alhambra_circle\ncoral_gabl": {
+        "selector": "#nearest_office_address",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

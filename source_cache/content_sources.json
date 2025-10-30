@@ -1,0 +1,91 @@
+{
+  "books": [
+    {
+      "name": "Publishers Weekly",
+      "domain": "publishersweekly.com",
+      "url": "https://www.publishersweekly.com/pw/nielsen/index.html",
+      "reliability": 0.95,
+      "selector": ".book-title",
+      "query_template": "site:publishersweekly.com {query}",
+      "item_pattern": "numbered_list"
+    },
+    {
+      "name": "NY Times Bestsellers",
+      "domain": "nytimes.com",
+      "url": "https://www.nytimes.com/books/best-sellers/",
+      "reliability": 0.98,
+      "selector": ".book-title",
+      "query_template": "site:nytimes.com {query}",
+      "item_pattern": "numbered_list"
+    },
+    {
+      "name": "Amazon Bestsellers",
+      "domain": "amazon.com",
+      "url": "https://www.amazon.com/best-sellers-books/zgbs/books",
+      "reliability": 0.90,
+      "selector": ".zg-item",
+      "query_template": "site:amazon.com bestsellers {query}",
+      "item_pattern": "numbered_list"
+    }
+  ],
+  "songs": [
+    {
+      "name": "Billboard Hot 100",
+      "domain": "billboard.com",
+      "url": "https://www.billboard.com/charts/hot-100/",
+      "reliability": 0.99,
+      "selector": ".chart-element__information__song",
+      "query_template": "site:billboard.com {query}",
+      "item_pattern": "numbered_list"
+    },
+    {
+      "name": "Spotify Charts",
+      "domain": "spotify.com",
+      "url": "https://charts.spotify.com/charts/view/regional-global-weekly/latest",
+      "reliability": 0.95,
+      "selector": ".chart-track-name",
+      "query_template": "site:spotify.com charts {query}",
+      "item_pattern": "numbered_list"
+    }
+  ],
+  "restaurants": [
+    {
+      "name": "Michelin Guide",
+      "domain": "guide.michelin.com",
+      "url": "https://guide.michelin.com/us/en/restaurants",
+      "reliability": 0.98,
+      "selector": ".restaurant-name",
+      "query_template": "site:guide.michelin.com {query}",
+      "item_pattern": "bullet_list"
+    },
+    {
+      "name": "Yelp Top Lists",
+      "domain": "yelp.com",
+      "url": "https://www.yelp.com/",
+      "reliability": 0.85,
+      "selector": ".restaurant-name",
+      "query_template": "site:yelp.com top {query}",
+      "item_pattern": "numbered_list"
+    }
+  ],
+  "movies": [
+    {
+      "name": "IMDb Top Rated",
+      "domain": "imdb.com",
+      "url": "https://www.imdb.com/chart/top/",
+      "reliability": 0.97,
+      "selector": ".titleColumn",
+      "query_template": "site:imdb.com top rated {query}",
+      "item_pattern": "numbered_list"
+    },
+    {
+      "name": "Rotten Tomatoes",
+      "domain": "rottentomatoes.com",
+      "url": "https://www.rottentomatoes.com/",
+      "reliability": 0.92,
+      "selector": ".movie-title",
+      "query_template": "site:rottentomatoes.com {query}",
+      "item_pattern": "numbered_list"
+    }
+  ]
+}

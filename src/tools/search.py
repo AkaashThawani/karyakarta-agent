@@ -106,7 +106,7 @@ OUTPUT: Formatted, relevant search results"""
     
     def _format_search_results(self, raw_results: str, query: str, num_results: int) -> str:
         """
-        Format and compress search results ONLY if needed (> 1500 chars).
+        Format search results and ALWAYS preserve URLs.
         
         Args:
             raw_results: Raw search results from Serper API
@@ -114,17 +114,10 @@ OUTPUT: Formatted, relevant search results"""
             num_results: Number of results requested
             
         Returns:
-            Formatted results (or raw if short)
+            Formatted results with URLs preserved
         """
         try:
-            # RULE 1: If results are short (< 1500 chars), return as-is!
-            if len(raw_results) < 1500:
-                print(f"[Search] Results short ({len(raw_results)} chars), returning as-is")
-                return raw_results
-            
-            print(f"[Search] Results long ({len(raw_results)} chars), formatting...")
-            
-            # RULE 2: Try to parse and format JSON
+            # ALWAYS try to parse and format JSON to preserve URLs
             if isinstance(raw_results, str) and (raw_results.startswith('{') or raw_results.startswith('[')):
                 try:
                     data = json.loads(raw_results)
@@ -134,16 +127,16 @@ OUTPUT: Formatted, relevant search results"""
                         for i, result in enumerate(results, 1):
                             title = result.get('title', 'No title')
                             snippet = result.get('snippet', 'No description')
-                            formatted += f"{i}. **{title}**\n   {snippet}\n\n"
+                            link = result.get('link', '')  # PRESERVE URL!
+                            formatted += f"{i}. **{title}**\n   {snippet}\n   URL: {link}\n\n"
                         
-                        # Only return formatted if actually shorter
-                        if len(formatted) < len(raw_results):
-                            print(f"[Search] Formatted to {len(formatted)} chars")
-                            return formatted.strip()
-                except:
-                    pass
+                        print(f"[Search] Formatted {len(results)} results with URLs preserved ({len(formatted)} chars)")
+                        return formatted.strip()
+                except Exception as e:
+                    print(f"[Search] JSON parsing failed: {e}")
             
-            # RULE 3: Fallback - truncate if still too long
+            # Fallback: return raw (but warn about missing URLs)
+            print(f"[Search] Could not parse JSON, returning raw ({len(raw_results)} chars)")
             if len(raw_results) > 2000:
                 return raw_results[:2000] + "..."
             
@@ -196,13 +189,16 @@ OUTPUT: Formatted, relevant search results"""
             print(f"\n[SEARCH] Query: {query}")
             print(f"[SEARCH] Num results: {num_results}")
             
-            # Execute search
-            raw_result = self.search.run(query)
+            # Execute search - use results() to get raw JSON with URLs
+            raw_result = self.search.results(query)
             
-            print(f"[SEARCH] Raw result length: {len(raw_result)} characters")
+            # Convert to string for formatting
+            raw_result_str = json.dumps(raw_result) if isinstance(raw_result, dict) else str(raw_result)
             
-            # Format and compress results
-            formatted_result = self._format_search_results(raw_result, query, num_results)
+            print(f"[SEARCH] Raw result length: {len(raw_result_str)} characters")
+            
+            # Format and compress results (will preserve URLs from JSON)
+            formatted_result = self._format_search_results(raw_result_str, query, num_results)
             
             print(f"[SEARCH] Formatted result length: {len(formatted_result)} characters")
             print(f"[SEARCH] Compression: {(1 - len(formatted_result)/len(raw_result)) * 100:.1f}%")

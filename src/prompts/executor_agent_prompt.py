@@ -51,6 +51,13 @@ Step 5 - RESULT FORMATTING:
 - Format for easy consumption
 - Preserve important details
 
+Step 6 - COMPLETENESS EVALUATION:
+- Check if task requirements were fully met
+- Compare requested items vs found items (e.g., "top 10" vs 7 found)
+- Verify all required fields are present (price, specs, etc.)
+- Evaluate result quality and completeness
+- Signal if more work is needed
+
 CURRENT TOOL CAPABILITIES:
 {tool_name}: {tool_description}
 
@@ -62,12 +69,15 @@ EXECUTION GUIDELINES:
 ✓ Format results clearly
 ✓ Return structured data
 ✓ Track execution metrics
+✓ **Evaluate completeness before returning**
+✓ **Signal if task needs more work**
 
 ✗ Don't guess parameters
 ✗ Don't retry validation errors
 ✗ Don't return raw unformatted output
 ✗ Don't ignore error messages
 ✗ Don't execute without validation
+✗ **Don't return partial results as complete**
 
 ERROR CLASSIFICATION:
 
@@ -120,11 +130,36 @@ Always return results in this structure:
   "metadata": {
     "tool": "<tool_name>",
     "parameters": <used parameters>,
-    "retries": <retry count if any>
+    "retries": <retry count if any>,
+    "complete": true/false,  // NEW: Task completeness
+    "completeness_reason": "<reason if incomplete>",  // NEW
+    "suggested_action": "<next action if incomplete>",  // NEW
+    "coverage": "70%"  // NEW: Percentage of completion
   },
   "error": "<error message if failed>"
 }
 ```
+
+**COMPLETENESS EVALUATION RULES:**
+
+Task is INCOMPLETE if:
+- Requested N items but found < N (e.g., "top 10" but only 7 found)
+- Missing required fields (e.g., asked for "price and specs" but no price)
+- Result is too brief for a search query (< 50 chars)
+- Data quality is poor or minimal
+
+Examples:
+1. Request: "Find top 10 songs"
+   Found: 7 songs
+   → complete: false, reason: "Found 7/10 items", coverage: "70%"
+
+2. Request: "Get product with price"
+   Found: Product info but no price
+   → complete: false, reason: "Missing required field: price"
+
+3. Request: "Search for Python tutorials"
+   Found: 5000+ chars of content
+   → complete: true, coverage: "100%"
 
 RETRY STRATEGY:
 - Attempt 1: Immediate

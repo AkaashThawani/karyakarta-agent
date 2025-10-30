@@ -31,7 +31,7 @@ class TaskDecomposer:
     
     def decompose(self, task_description: str, task_id: str) -> List[Dict[str, Any]]:
         """
-        Decompose a task into structured subtasks.
+        Decompose a task into structured subtasks with completeness awareness.
         
         Args:
             task_description: User's task description
@@ -42,6 +42,11 @@ class TaskDecomposer:
         """
         print(f"[DECOMPOSER] Decomposing task: {task_description}")
         
+        # Extract required fields from task description
+        required_fields = self._extract_required_fields(task_description)
+        if required_fields:
+            print(f"[DECOMPOSER] Detected required fields: {required_fields}")
+        
         if not self.llm_service:
             print("[DECOMPOSER] No LLM service, using keyword fallback")
             return self._fallback_decomposition(task_description, task_id)
@@ -51,6 +56,11 @@ class TaskDecomposer:
             
             if subtasks:
                 print(f"[DECOMPOSER] LLM generated {len(subtasks)} subtasks")
+                
+                # NEW: Add completeness check after extraction subtasks
+                if required_fields:
+                    subtasks = self._add_completeness_checks(subtasks, required_fields, task_id)
+                
                 return subtasks
             else:
                 print("[DECOMPOSER] LLM returned empty, using fallback")
@@ -228,7 +238,47 @@ Available selector hints:
 - For filling fields, use method="fill" with selector_hint or selector and args.value
 - For clicking, use method="click" with selector_hint or selector
 - For pressing keys, use method="press" with selector and args.key
+- **CRITICAL: After clicks that navigate to new pages, add wait_for_load_state**
+- For content extraction after navigation, use method="wait_for_load_state" then "inner_text" or "text_content"
 - Break complex tasks into multiple simple steps
+
+**Navigation & Content Extraction Pattern:**
+When clicking a link/button that navigates to a new page, follow this pattern:
+
+Step 1: Click the element
+{{
+  "tool": "playwright_execute",
+  "method": "click",
+  "selector": "a:has-text('FAQ')"
+}}
+
+Step 2: Wait 3 seconds for page to load (CRITICAL!)
+{{
+  "tool": "playwright_execute",
+  "method": "wait_for_timeout",
+  "args": {{"timeout": 3000}}
+}}
+
+Step 3: Close any popups/modals (CRITICAL! Many sites show login/signup modals)
+{{
+  "tool": "playwright_execute",
+  "method": "press",
+  "selector": "body",
+  "args": {{"key": "Escape"}}
+}}
+
+Step 4: Extract content from loaded page
+{{
+  "tool": "playwright_execute",
+  "method": "text_content",
+  "selector": "body"  // or more specific selector
+}}
+
+**CRITICAL: Popup/Modal Handling**
+Many sites (Amazon, Goodreads, etc.) show popups after navigation. ALWAYS add this step after waiting:
+- Press Escape key on body element to close modals
+- This prevents "element intercepts pointer events" errors
+- Add this BEFORE any clicks on the new page
 
 **CRITICAL: URL Format**
 ALL URLs must include the protocol (https:// or http://):
@@ -238,24 +288,19 @@ ALL URLs must include the protocol (https:// or http://):
 - ❌ WRONG: "httpbin.org/forms/post"
 
 **Output Format:**
-Return ONLY a valid JSON array, no explanations:
+Return ONLY a valid JSON array with NO explanations, NO markdown, NO code blocks.
 
-```json
-[
-  {{
-    "tool": "playwright_execute",
-    "action": "goto",
-    "parameters": {{
-      "url": "https://example.com",
-      "method": "goto",
-      "args": {{}}
-    }},
-    "description": "Navigate to example.com"
-  }}
-]
-```
+**CRITICAL JSON Rules:**
+1. All strings MUST use double quotes (not single quotes)
+2. Escape special characters in strings (use \\" for quotes inside strings)
+3. NO trailing commas after last item in objects/arrays
+4. NO comments in JSON
+5. Ensure all brackets and braces are properly closed
 
-JSON Array:"""
+**Example Output:**
+[{{"tool":"google_search","action":"query","parameters":{{"query":"cats"}},"description":"Search for cats"}},{{"tool":"playwright_execute","action":"goto","parameters":{{"url":"https://example.com","method":"goto","args":{{}}}},"description":"Navigate to example.com"}}]
+
+Return ONLY the JSON array (no markdown, no explanation):"""
         
         return prompt
     
@@ -301,9 +346,16 @@ JSON Array:"""
         
         # Validate playwright_execute has method
         if subtask["tool"] == "playwright_execute":
-            if "method" not in subtask["parameters"]:
+            # Accept method at top level OR inside parameters
+            has_method = "method" in subtask or "method" in subtask["parameters"]
+            if not has_method:
                 print(f"[DECOMPOSER] Invalid playwright subtask - missing method: {subtask}")
                 return False
+            
+            # If method is at top level, move it to parameters
+            if "method" in subtask and "method" not in subtask["parameters"]:
+                subtask["parameters"]["method"] = subtask.pop("method")
+                print(f"[DECOMPOSER] Moved method to parameters: {subtask['parameters']['method']}")
         
         return True
     
@@ -323,6 +375,30 @@ JSON Array:"""
         description_lower = task_description.lower()
         subtasks = []
         counter = 0
+        
+        # Check for "go to X page" pattern (e.g., "go to battlefield 6 page")
+        goto_page_pattern = r'(?:go\s+to|navigate\s+to|visit)\s+([^,\.]+?)\s+page'
+        goto_match = re.search(goto_page_pattern, description_lower, re.IGNORECASE)
+        
+        if goto_match:
+            # Extract the target (e.g., "battlefield 6")
+            target = goto_match.group(1).strip()
+            print(f"[DECOMPOSER] Detected 'go to page' pattern: {target}")
+            
+            # Use Google search to find the page
+            subtasks.append({
+                "subtask_id": f"{task_id}_sub_{counter}",
+                "tool": "google_search",
+                "action": "query",
+                "parameters": {
+                    "query": f"{target} official page"
+                },
+                "description": f"Search for {target} page"
+            })
+            counter += 1
+            
+            # Note: The agent will extract URLs from search and visit them
+            return subtasks
         
         # Check for browser automation keywords
         browser_keywords = ["go to", "navigate", "visit", "click", "fill", "search", "submit"]
@@ -402,6 +478,92 @@ JSON Array:"""
             })
         
         return subtasks if subtasks else []
+    
+    def _extract_required_fields(self, task_description: str) -> List[str]:
+        """
+        Extract required fields from task description using LLM.
+        NO hardcoding - LLM determines what fields are needed!
+        
+        Args:
+            task_description: User's task description
+            
+        Returns:
+            List of required field names
+        """
+        if not self.llm_service:
+            # Fallback: return empty if no LLM
+            return []
+        
+        try:
+            prompt = f"""Extract the data fields requested in this query.
+
+Query: "{task_description}"
+
+Return ONLY a JSON array of field names the user wants:
+["field1", "field2", ...]
+
+Examples:
+- "Find restaurants with name and phone" → ["name", "phone"]
+- "Get product title, price, rating" → ["title", "price", "rating"]
+- "List hotels with location and website" → ["location", "website"]
+
+Return ONLY the JSON array (no explanation):"""
+            
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content if hasattr(response, 'content') else str(response)
+            
+            # Extract JSON array
+            json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+            if json_match:
+                fields = json.loads(json_match.group())
+                if isinstance(fields, list):
+                    return fields
+            
+            return []
+            
+        except Exception as e:
+            print(f"[DECOMPOSER] LLM field extraction failed: {e}")
+            return []
+    
+    def _add_completeness_checks(
+        self,
+        subtasks: List[Dict[str, Any]],
+        required_fields: List[str],
+        task_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Add completeness check steps after extraction subtasks.
+        
+        Args:
+            subtasks: Original subtasks
+            required_fields: Required field names
+            task_id: Task identifier
+            
+        Returns:
+            Updated subtasks with completeness checks
+        """
+        # Find extraction subtasks (extract_chart, extract_data, etc.)
+        extraction_indices = []
+        for i, subtask in enumerate(subtasks):
+            method = subtask.get('parameters', {}).get('method', '')
+            if 'extract' in method.lower():
+                extraction_indices.append(i)
+        
+        if not extraction_indices:
+            # No extraction tasks, nothing to check
+            return subtasks
+        
+        # Add completeness metadata to extraction tasks
+        for idx in extraction_indices:
+            if 'metadata' not in subtasks[idx]:
+                subtasks[idx]['metadata'] = {}
+            subtasks[idx]['metadata']['required_fields'] = required_fields
+            subtasks[idx]['metadata']['check_completeness'] = True
+        
+        print(f"[DECOMPOSER] Added completeness checks for {len(required_fields)} fields")
+        
+        return subtasks
 
 
 def create_decomposer(llm_service: Any) -> TaskDecomposer:

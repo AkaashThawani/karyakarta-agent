@@ -1,0 +1,24 @@
+{
+  "playwright_execute": {
+    "search_input": {
+      "best": null,
+      "selectors": {
+        "#twotabsearchtextbox": {
+          "success": 2,
+          "fail": 0,
+          "last_used": 1761794802.3155427,
+          "avg_response_time": 0.2564992904663086
+        }
+      },
+      "fallbacks": []
+    }
+  },
+  "site_intelligence": {
+    "url": "https://www.amazon.com/OnePlus-Smartphone-Snapdragon-SUPERVOOC-Hasselblad/dp/B0DP96J3KT/ref=sr_1_1?crid=3TVE69ALPWHC5&dib=eyJ2IjoiMSJ9.rF8BtwcGlRr_FtU9YI7DNPn6ZW8EDxgl1-5jQU2vD0iy5oV6rigWrJVdbEtLpvojuT8UbnpG-BGcy-Q97DZQTuJdrN6uipHFNCeqNv4pJ0OHr6SbRdlVo-0oWsqdsf424Cyo7z72vcFkKgVLdT7BWi7_31wF4kOBkbfUf4_SLslhjKOj3bDZGTEjo82j-xONcOp2PwaebOqbXcYvxAzevQZii-wAQG5IKmXQLBF5LG0.s4BqLQLJilOVLQB3mSbpZEWoy9Xyv11t44KztAPtzOc&dib_tag=se&keywords=oneplus+13r&qid=1761794801&sprefix=oneplus13r%2Caps%2C185&sr=8-1#customerReviews",
+    "learned_at": "2025-10-29T20:28:16.277535",
+    "total_elements_found": 0,
+    "classified_elements": 0,
+    "discovered_types": [],
+    "elements": {}
+  }
+}

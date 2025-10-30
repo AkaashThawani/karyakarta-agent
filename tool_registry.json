@@ -678,6 +678,50 @@
     ],
     "requires_selector": true
   },
+  "playwright_scroll": {
+    "tool": "playwright_execute",
+    "method": "evaluate",
+    "description": "Scroll the page down",
+    "actions": [
+      "scroll",
+      "scroll_down"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "scroll",
+      "scroll down",
+      "page down"
+    ],
+    "requires_selector": false
+  },
+  "playwright_scroll_up": {
+    "tool": "playwright_execute",
+    "method": "evaluate",
+    "description": "Scroll the page up",
+    "actions": [
+      "scroll_up"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "scroll up",
+      "page up"
+    ],
+    "requires_selector": false
+  },
+  "playwright_scroll_to_bottom": {
+    "tool": "playwright_execute",
+    "method": "evaluate",
+    "description": "Scroll to bottom of page",
+    "actions": [
+      "scroll_to_bottom"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "scroll to bottom",
+      "end of page"
+    ],
+    "requires_selector": false
+  },
   "playwright_reload": {
     "tool": "playwright_execute",
     "method": "reload",
@@ -726,10 +770,10 @@
   "google_search": {
     "tool": "google_search",
     "method": "query",
-    "description": "Search the web using Google",
+    "description": "Search Google for information",
     "actions": [
-      "query",
-      "search"
+      "search",
+      "query"
     ],
     "selector_hints": [],
     "keywords": [
@@ -743,6 +787,31 @@
     "requires_selector": false,
     "parameters": {
       "query": "string - Search query (required)"
+    }
+  },
+  "chart_extractor": {
+    "tool": "chart_extractor",
+    "method": "extract_chart",
+    "description": "Extract structured data (tables, lists) from webpages",
+    "actions": [
+      "extract_chart",
+      "extract_table",
+      "extract_list"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "extract",
+      "scrape",
+      "table",
+      "list",
+      "chart",
+      "data",
+      "structured"
+    ],
+    "requires_selector": false,
+    "parameters": {
+      "url": "string - URL to extract from (required)",
+      "required_fields": "array - Fields to extract (required)"
     }
   },
   "browse_website": {

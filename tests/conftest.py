@@ -11,7 +11,7 @@ from typing import Optional
 import os
 
 # Set test environment variables before importing app modules
-os.environ["GOOGLE_API_KEY"] = "test_google_key"
+os.environ["GEMINI_API_KEY"] = "test_google_key"
 os.environ["SERPER_API_KEY"] = "test_serper_key"
 os.environ["BROWSERLESS_API_KEY"] = "test_browserless_key"
 os.environ["LOGGING_URL"] = "http://localhost:3000/api/socket/log"
@@ -26,7 +26,7 @@ from src.tools.base import ToolResult
 def mock_settings():
     """Provide test configuration settings."""
     return Settings(
-        google_api_key="test_google_key",
+        GEMINI_API_KEY="test_google_key",
         serper_api_key="test_serper_key",
         browserless_api_key="test_browserless_key",
         logging_url="http://localhost:3000/api/socket/log",

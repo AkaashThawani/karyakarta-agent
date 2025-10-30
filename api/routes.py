@@ -28,12 +28,27 @@ router = APIRouter(
 @router.get("/")
 def read_root():
     """
-    Health check endpoint.
+    Root endpoint.
     
     Returns:
         dict: Status message
     """
     return {"status": "KaryaKarta Python Agent is running."}
+
+
+@router.get("/health")
+def health_check():
+    """
+    Health check endpoint for Docker and monitoring.
+    
+    Returns:
+        dict: Health status
+    """
+    return {
+        "status": "healthy",
+        "service": "karyakarta-agent",
+        "version": "1.0.0"
+    }
 
 
 @router.post("/execute-task", response_model=TaskResponse)

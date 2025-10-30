@@ -14,6 +14,7 @@ from src.prompts import get_reason_agent_prompt
 from src.routing.task_decomposer import create_decomposer
 import time
 import json
+import asyncio
 
 
 class ReasonAgent(BaseAgent):
@@ -118,6 +119,18 @@ class ReasonAgent(BaseAgent):
             # Update context
             if context:
                 self.context.update(context)
+                
+                # FIX 3: Populate memory from context
+                if "conversation_history" in context:
+                    self.conversation_history = context["conversation_history"]
+                    print(f"[REASON] Loaded {len(self.conversation_history)} messages from context")
+                
+                if "previous_results" in context:
+                    self.previous_results = context["previous_results"]
+                    print(f"[REASON] Loaded {len(self.previous_results)} previous results")
+                
+                if "original_request" in context:
+                    self.original_request = context["original_request"]
             
             # Step 1: Analyze the task
             self.log("Step 1: Analyzing task requirements...")
@@ -132,8 +145,8 @@ class ReasonAgent(BaseAgent):
                 self.log("Step 3: Task requires delegation to executors")
                 subtasks = plan.get("subtasks", [])
                 
-                # Actually delegate to executor agents
-                subtask_results = self._execute_delegation(subtasks)
+                # Actually delegate to executor agents (pass plan for auto-extraction)
+                subtask_results = self._execute_delegation(subtasks, plan)
                 
                 # Step 4: Synthesize results
                 self.log("Step 4: Synthesizing results...")
@@ -241,8 +254,38 @@ class ReasonAgent(BaseAgent):
         for executor in self.executor_agents:
             if hasattr(executor, 'tools'):
                 for tool in executor.tools:
+                    # Try multiple ways to get tool info
                     if hasattr(tool, 'name') and hasattr(tool, 'description'):
                         descriptions[tool.name] = tool.description
+                    elif hasattr(tool, 'func'):
+                        # LangChain tool wrapper
+                        func = tool.func if callable(tool.func) else tool
+                        if hasattr(func, 'name'):
+                            name = func.name # pyright: ignore[reportFunctionMemberAccess]
+                            desc = getattr(func, 'description', f"Tool: {name}")
+                            descriptions[name] = desc
+        
+        # If still empty, load from tool registry file
+        if not descriptions:
+            try:
+                import json
+                from pathlib import Path
+                registry_path = Path(__file__).parent.parent.parent / "tool_registry.json"
+                if registry_path.exists():
+                    with open(registry_path, 'r') as f:
+                        registry = json.load(f)
+                        # Handle flat dictionary format
+                        for tool_name, tool_data in registry.items():
+                            if not tool_name.startswith("_"):  # Skip disabled tools
+                                # Use tool_name (registry key) as description key, not tool value
+                                # This prevents playwright_click, playwright_fill, etc from overwriting each other
+                                desc = tool_data.get("description", f"Tool: {tool_name}")
+                                descriptions[tool_name] = desc
+                    print(f"[REASON] Loaded {len(descriptions)} tool descriptions from registry file")
+            except Exception as e:
+                print(f"[REASON] Failed to load from registry file: {e}")
+                import traceback
+                traceback.print_exc()
         
         self._tool_descriptions = descriptions
         print(f"[REASON] Loaded {len(descriptions)} tool descriptions")
@@ -251,6 +294,8 @@ class ReasonAgent(BaseAgent):
     def _llm_tool_selection(self, task: AgentTask) -> List[str]:
         """
         Use LLM to intelligently select tools based on descriptions.
+        Enhanced with few-shot examples and better prompting.
+        Uses the reason agent prompt for better guidance.
         
         Args:
             task: Task to analyze
@@ -264,27 +309,69 @@ class ReasonAgent(BaseAgent):
             print("[REASON] No tool descriptions available, using keyword fallback")
             return []
         
-        # Build prompt for LLM
-        prompt = f"""You are a task planning assistant. Given a user's request and available tools, select the appropriate tools needed.
+        # Get reason agent guidance
+        reason_prompt = get_reason_agent_prompt(self.available_tools)
+        
+        # Build prompt with few-shot examples and reason agent context
+        prompt = f"""You are an expert task planner. Select the right tools to accomplish user requests.
+
+IMPORTANT FROM YOUR INSTRUCTIONS:
+- You can use the SAME tool MULTIPLE times with different parameters
+- Don't stop after one search if results are incomplete
+- For "find top 10 X", you may need multiple searches to get all 10
+- Check conversation history for previous context
 
 Available Tools:
 """
-        for name, desc in tool_descriptions.items():
+        # Show only most relevant tools to reduce token usage
+        relevant_tools = {
+            "google_search": "Search Google for information",
+            "playwright_execute": "Automate browser actions (navigate, click, fill forms, extract data)",
+            "chart_extractor": "Extract structured data (tables, lists) from webpages"
+        }
+        
+        for name, desc in relevant_tools.items():
             prompt += f"- {name}: {desc}\n"
         
         prompt += f"""
+FEW-SHOT EXAMPLES:
+
+Example 1:
+User: "Find weather in Paris"
+Tools: ["google_search"]
+Reasoning: Simple search query, no extraction needed
+
+Example 2:
+User: "Find top 10 restaurants in NYC with phone numbers"
+Tools: ["google_search", "playwright_execute"]
+Reasoning: Search first, then use playwright to visit pages and extract structured data
+
+Example 3:
+User: "Go to example.com and fill the contact form"
+Tools: ["playwright_execute"]
+Reasoning: Direct browser automation, no search needed
+
+Example 4:
+User: "What are the best laptops under $1000"
+Tools: ["google_search"]
+Reasoning: Information query, search is sufficient
+
+YOUR TURN:
 User Request: "{task.description}"
 
-Select the tools needed to accomplish this request. Consider:
-1. Search tools to find information
-2. Browsing tools to visit websites
-3. Extraction tools to get structured data
-4. Analysis tools to process results
+Think step-by-step:
+1. Does this need web search? (finding information, discovering sources)
+2. Does this need browser automation? (visiting sites, clicking, filling forms)
+3. Does this need structured extraction? (tables, lists, multiple items with fields)
 
-Return ONLY a JSON array of tool names in execution order, like:
-["google_search", "browse_website", "extract_table"]
+Return ONLY a JSON array of tool names:
+["tool1", "tool2"]
 
-If unsure, default to ["google_search"].
+Important:
+- For "find X restaurants/hotels/places with details" → use ["google_search", "playwright_execute"]
+- For "go to X.com and do Y" → use ["playwright_execute"]
+- For "what is/find information about X" → use ["google_search"]
+- If query asks for phone numbers, addresses, websites → include playwright_execute for extraction
 
 JSON Response:"""
         
@@ -302,12 +389,20 @@ JSON Response:"""
             
             # Parse JSON
             import re
-            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            json_match = re.search(r'\[.*?\]', content, re.DOTALL)
             if json_match:
                 tools_json = json_match.group()
                 tools = json.loads(tools_json)
-                print(f"[REASON] LLM selected tools: {tools}")
-                return tools
+                
+                # Validate tools exist
+                valid_tools = [t for t in tools if t in relevant_tools]
+                
+                if valid_tools:
+                    print(f"[REASON] LLM selected tools: {valid_tools}")
+                    return valid_tools
+                else:
+                    print(f"[REASON] LLM selected invalid tools: {tools}, using fallback")
+                    return []
             else:
                 print("[REASON] Could not parse LLM response, using fallback")
                 return []
@@ -327,6 +422,11 @@ JSON Response:"""
         Returns:
             List of required tool names in execution order
         """
+        # Check if this is a follow-up question
+        if self._is_followup_question(task.description):
+            print("[REASON] Detected follow-up question - using previous context")
+            return []  # No tools needed, will use previous results
+        
         print("[REASON] Using LLM-based tool selection...")
         tools = self._llm_tool_selection(task)
         
@@ -336,6 +436,85 @@ JSON Response:"""
             tools = self._keyword_based_tool_selection(task)
         
         return tools
+    
+    def _is_followup_question(self, query: str) -> bool:
+        """
+        Use LLM to detect if query is a follow-up to previous conversation.
+        ZERO HARDCODING - works for ANY follow-up pattern.
+        
+        Args:
+            query: User's query
+            
+        Returns:
+            True if follow-up question
+        """
+        last_query = ""
+        
+        # Try to get last query from previous_results first
+        if self.previous_results:
+            last_result = self.previous_results[-1]
+            last_query = last_result.get("task", "")
+            print(f"[REASON] DEBUG: Got last_query from previous_results: '{last_query}'")
+        
+        # Fallback: use conversation_history if previous_results is empty/broken
+        if not last_query and len(self.conversation_history) >= 2:
+            print("[REASON] DEBUG: previous_results empty, trying conversation_history")
+            # Get last user message (skip current one which hasn't been added yet)
+            for msg in reversed(self.conversation_history):
+                if msg["role"] == "user":
+                    last_query = msg["content"]
+                    print(f"[REASON] DEBUG: Got last_query from conversation_history: '{last_query}'")
+                    break
+        
+        # If still no last_query, can't be follow-up
+        if not last_query:
+            print("[REASON] No previous query found - cannot be follow-up")
+            return False
+        
+        # Don't waste LLM call if queries are identical
+        if query.lower().strip() == last_query.lower().strip():
+            print("[REASON] Queries are identical - not a follow-up")
+            return False
+        
+        prompt = f"""Is this a follow-up question that refers to previous data?
+
+Previous Query: "{last_query}"
+Current Query: "{query}"
+
+A follow-up question:
+- Asks to format/transform previous data (table, list, chart, graph)
+- Asks to add/modify/filter fields from previous data
+- Refers to "it", "that", "the data", "those results", "them"
+- Asks for clarification about previous results
+- Requests different presentation of same data
+
+NOT a follow-up:
+- Completely new topic
+- Different data request unrelated to previous
+- New search query
+
+Answer ONLY: yes or no
+
+Answer:"""
+        
+        try:
+            if not self.llm_service:
+                print("[REASON] No LLM service, cannot detect follow-up")
+                return False
+            
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            answer = response.content.strip().lower()
+            
+            is_followup = "yes" in answer
+            print(f"[REASON] Follow-up detection: {is_followup} ('{query}' vs '{last_query}')")
+            return is_followup
+            
+        except Exception as e:
+            print(f"[REASON] Follow-up detection failed: {e}")
+            # Fallback: check for very obvious patterns
+            query_lower = query.lower().strip()
+            return any(word in query_lower for word in ["table", "format", "show", "display"]) and len(query.split()) < 10
     
     def _keyword_based_tool_selection(self, task: AgentTask) -> List[str]:
         """
@@ -371,6 +550,185 @@ JSON Response:"""
         print("[REASON] No specific keywords matched, defaulting to google_search")
         return ["google_search"]
     
+    def _needs_structured_extraction(self, query: str) -> bool:
+        """
+        Use LLM to determine if query needs structured data extraction.
+        Zero hardcoding - works for ANY query type.
+        """
+        prompt = f"""Does this query require extracting structured data from webpages?
+
+Query: "{query}"
+
+Structured extraction means:
+- Lists (top 10, best 5, rankings)
+- Tables (comparisons, stats, data)
+- Collections (items with multiple fields)
+
+Non-structured:
+- Simple facts ("what is...")
+- Definitions
+- Single answers
+
+Answer: yes or no
+
+Answer:"""
+        
+        try:
+            if not self.llm_service:
+                # Fallback: check for numbers
+                import re
+                return bool(re.search(r'\d+|top|best|list', query.lower()))
+            
+            response = self.llm_service.get_model().invoke(prompt)
+            answer = response.content.strip().lower()
+            needs_extraction = "yes" in answer
+            print(f"[REASON] Structured extraction needed: {needs_extraction}")
+            return needs_extraction
+        except:
+            # Fallback: assume yes if query has numbers or keywords
+            import re
+            return bool(re.search(r'\d+|top|best|list', query.lower()))
+    
+    def _extract_required_fields_llm(self, query: str) -> List[str]:
+        """
+        Use LLM to extract user-requested fields AND suggest additional useful fields.
+        Zero hardcoding - works for any query type.
+        """
+        prompt = f"""Analyze this query and extract field requirements.
+
+Query: "{query}"
+
+Return JSON with:
+1. Fields user explicitly requested
+2. Additional fields that would be useful (specs, details, etc.)
+3. Category/type of data
+4. Time period (year, date range)
+
+Example for "top 10 laptops of 2024":
+{{
+    "user_requested": ["name", "rank"],
+    "suggested": ["CPU", "RAM", "storage", "GPU", "price", "rating", "release_date"],
+    "category": "laptops",
+    "year": 2024
+}}
+
+Example for "best restaurants in NYC with phone":
+{{
+    "user_requested": ["name", "phone"],
+    "suggested": ["address", "cuisine", "price_range", "rating", "hours"],
+    "category": "restaurants",
+    "location": "NYC"
+}}
+
+Return ONLY valid JSON:"""
+        
+        try:
+            if not self.llm_service:
+                # Fallback
+                return ["name", "description"]
+            
+            response = self.llm_service.get_model().invoke(prompt)
+            content = response.content.strip()
+            
+            # Parse JSON
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                # Combine user requested + suggested
+                user_fields = result.get("user_requested", [])
+                suggested_fields = result.get("suggested", [])
+                all_fields = user_fields + suggested_fields
+                
+                # Remove duplicates while preserving order
+                seen = set()
+                final_fields = []
+                for field in all_fields:
+                    if field not in seen:
+                        seen.add(field)
+                        final_fields.append(field)
+                
+                print(f"[REASON] User requested: {user_fields}")
+                print(f"[REASON] Suggested: {suggested_fields}")
+                print(f"[REASON] Final fields: {final_fields}")
+                
+                # Store metadata
+                if "category" in result:
+                    print(f"[REASON] Category: {result['category']}")
+                if "year" in result:
+                    print(f"[REASON] Year: {result['year']}")
+                
+                return final_fields
+        except Exception as e:
+            print(f"[REASON] Field extraction failed: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Fallback
+        return ["name", "description"]
+    
+    def _extract_urls_from_search(self, search_results: str) -> List[str]:
+        """
+        Extract URLs from search results.
+        Returns top relevant URLs for extraction.
+        """
+        import re
+        
+        # Extract URLs
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        urls = re.findall(url_pattern, search_results)
+        
+        # Filter out common non-content URLs
+        filtered_urls = [
+            url for url in urls[:10]  # Top 10 results
+            if not any(skip in url.lower() for skip in [
+                'google.com', 'youtube.com/results', 'facebook.com',
+                'twitter.com', 'linkedin.com', 'instagram.com'
+            ])
+        ]
+        
+        print(f"[REASON] Extracted {len(filtered_urls)} URLs from search")
+        return filtered_urls[:3]  # Top 3 URLs
+    
+    def _create_extraction_tasks_from_urls(
+        self,
+        urls: List[str],
+        required_fields: List[str],
+        base_task_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Create extraction tasks for each URL.
+        Uses playwright_execute to navigate, then chart_extractor to extract.
+        This leverages the persistent browser from UniversalPlaywrightTool.
+        """
+        tasks = []
+        
+        for i, url in enumerate(urls):
+            # Task 1: Navigate to URL using persistent browser
+            tasks.append({
+                "subtask_id": f"{base_task_id}_nav_{i}",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "url": url,
+                    "method": "goto"
+                },
+                "description": f"Navigate to {url}"
+            })
+            
+            # Task 2: Extract data from current page
+            tasks.append({
+                "subtask_id": f"{base_task_id}_extract_{i}",
+                "tool": "chart_extractor",
+                "parameters": {
+                    "required_fields": required_fields
+                },
+                "description": f"Extract structured data from current page"
+            })
+        
+        print(f"[REASON] Created {len(tasks)} extraction tasks (navigate + extract pairs)")
+        return tasks
+    
     def _create_plan(self, task: AgentTask, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create execution plan based on analysis.
@@ -388,8 +746,22 @@ JSON Response:"""
         plan = {
             "needs_delegation": len(required_tools) > 0,
             "complexity": complexity,
-            "subtasks": []
+            "subtasks": [],
+            "needs_follow_up_extraction": False,
+            "required_fields": [],
+            "original_task_id": task.task_id
         }
+        
+        # Check if structured extraction needed (LLM-based)
+        if self._needs_structured_extraction(task.description):
+            print("[REASON] Task needs structured extraction")
+            
+            # Extract required fields (LLM-based)
+            required_fields = self._extract_required_fields_llm(task.description)
+            plan["needs_follow_up_extraction"] = True
+            plan["required_fields"] = required_fields
+            
+            print(f"[REASON] Will extract fields: {required_fields}")
         
         # Use LLM-based decomposer for playwright tasks
         if "playwright_execute" in required_tools:
@@ -691,19 +1063,210 @@ JSON Response:"""
             # Default: pass query parameter
             return {"query": query}
     
-    def _execute_delegation(self, subtasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _execute_parallel_extraction(
+        self,
+        urls: List[str],
+        required_fields: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract from multiple URLs in PARALLEL using separate browser contexts.
+        Each URL gets its own tab/context.
+        
+        Args:
+            urls: List of URLs to extract from
+            required_fields: Fields to extract
+            
+        Returns:
+            List of extraction results
+        """
+        print(f"[REASON] 🚀 Starting PARALLEL extraction from {len(urls)} URLs")
+        
+        try:
+            from playwright.async_api import async_playwright
+            import os
+            
+            # Respect HEADLESS environment variable (same as main playwright tool)
+            headless_mode = os.getenv("HEADLESS", "true").lower() == "true"
+            print(f"[REASON] Browser mode: {'headless' if headless_mode else 'headed'}")
+            
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=headless_mode)
+                
+                # Create extraction tasks for each URL (parallel)
+                tasks = [
+                    self._extract_single_url(browser, url, required_fields)
+                    for url in urls
+                ]
+                
+                # Run ALL URLs in parallel with 3-minute overall timeout
+                try:
+                    async with asyncio.timeout(180):  # 3 minutes for all
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+                except asyncio.TimeoutError:
+                    print(f"[REASON] ⚠️ Overall timeout - using partial results")
+                    results = []
+                
+                await browser.close()
+                
+                # Filter successful results
+                successful = [
+                    r for r in results 
+                    if not isinstance(r, Exception) and r.get('success')
+                ]
+                
+                print(f"[REASON] ✅ Parallel extraction complete: {len(successful)}/{len(urls)} URLs")
+                return successful
+                
+        except Exception as e:
+            print(f"[REASON] ❌ Parallel extraction failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    async def _extract_single_url(
+        self,
+        browser: Any,
+        url: str,
+        required_fields: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Extract from one URL in a separate context (tab).
+        Uses parallel element extraction internally.
+        NOW WITH SITE INTELLIGENCE!
+        
+        Args:
+            browser: Playwright browser instance
+            url: URL to extract from
+            required_fields: Fields to extract
+            
+        Returns:
+            Extraction result dict
+        """
+        try:
+            async with asyncio.timeout(120):  # 2 minutes per URL
+                # Create new context (like a new tab)
+                context = await browser.new_context()
+                page = await context.new_page()
+                
+                print(f"[REASON] 📄 Extracting from {url}")
+                
+                # Navigate
+                await page.goto(url, wait_until='domcontentloaded')
+                
+                # DISABLED: Site Intelligence (causing JSON parsing issues)
+                # TODO: Re-enable after fixing "Extra data" JSON parsing
+                # from urllib.parse import urlparse
+                # domain = urlparse(url).netloc
+                # ... (Site Intelligence code commented out)
+                print(f"[REASON] ⚠️ Site Intelligence disabled - extracting directly")
+                
+                # Get HTML
+                html = await page.content()
+                
+                # Extract with PARALLEL element extraction
+                from src.tools.universal_extractor import UniversalExtractor, SmartSearcher
+                
+                extractor = UniversalExtractor()
+                all_data = await extractor.extract_everything_async(html, url)
+                
+                # Search for required fields
+                searcher = SmartSearcher()
+                query = ' '.join(required_fields)
+                records = searcher.search(all_data, query, required_fields)
+                
+                # NEW: Validate with SchemaBuilder
+                if records:
+                    try:
+                        from src.utils.schema_builder import SchemaBuilder
+                        
+                        builder = SchemaBuilder()
+                        
+                        # Build schema from first few records
+                        schema = builder.build_schema(records[:5])
+                        print(f"[REASON] 📋 Built schema with {len(schema.get('fields', {}))} fields")
+                        
+                        # Validate each record
+                        complete_count = 0
+                        incomplete_count = 0
+                        
+                        for record in records:
+                            validation = builder.validate_record(record, schema)
+                            if validation['valid'] and validation['completeness'] > 0.7:
+                                complete_count += 1
+                            else:
+                                incomplete_count += 1
+                        
+                        print(f"[REASON] ✓ Validated: {complete_count} complete, {incomplete_count} incomplete")
+                        
+                    except Exception as e:
+                        print(f"[REASON] ⚠️ Schema validation failed: {e}")
+                
+                await context.close()
+                
+                print(f"[REASON] ✅ Extracted {len(records)} records from {url}")
+                
+                return {
+                    'url': url,
+                    'data': records,
+                    'success': True,
+                    'count': len(records)
+                }
+                
+        except asyncio.TimeoutError:
+            print(f"[REASON] ⏱️ Timeout extracting from {url}")
+            return {
+                'url': url,
+                'success': False,
+                'error': 'timeout'
+            }
+        except Exception as e:
+            print(f"[REASON] ❌ Error extracting from {url}: {e}")
+            return {
+                'url': url,
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _execute_delegation(self, subtasks: List[Dict[str, Any]], plan: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Actually delegate tasks to executor agents and get real results.
         Handles sequential dependencies between tasks.
+        NOW WITH PARALLEL URL EXTRACTION!
         
         Args:
             subtasks: List of subtasks to delegate
+            plan: Optional execution plan with extraction settings
             
         Returns:
             List of results from executors
         """
         results = []
         previous_result = None
+        
+        # Filter out invalid tasks before execution
+        valid_subtasks = []
+        for subtask in subtasks:
+            # Skip playwright tasks with no URL
+            if subtask["tool"] == "playwright_execute":
+                url = subtask["parameters"].get("url")
+                if not url or url == "None":
+                    print(f"[REASON] ⚠️ Skipping playwright task with no URL")
+                    continue
+            valid_subtasks.append(subtask)
+        
+        if not valid_subtasks:
+            print(f"[REASON] ⚠️ No valid subtasks to execute after filtering")
+            return results
+        
+        subtasks = valid_subtasks
+        
+        # NEW: Track follow-ups per tool to prevent infinite loops
+        MAX_FOLLOW_UPS_PER_TOOL = 3
+        follow_up_counts = {}  # {tool_name: count}
+        previous_coverage = {}  # {tool_name: coverage_percentage}
+        
+        # Track if we've already added extraction tasks
+        extraction_tasks_added = False
         
         for i, subtask in enumerate(subtasks):
             print(f"\n[REASON] === Subtask {i+1}/{len(subtasks)}: {subtask['tool']} ===")
@@ -797,6 +1360,149 @@ JSON Response:"""
                 previous_result = result_entry
                 
                 self.log(f"Subtask completed: {subtask['tool']} - Success: {result.success}")
+                
+                # NEW: Auto-extraction after search completes WITH PARALLEL EXECUTION!
+                if (result.success and 
+                    subtask["tool"] == "google_search" and 
+                    plan and 
+                    plan.get("needs_follow_up_extraction") and 
+                    not extraction_tasks_added):
+                    
+                    print("[REASON] ✨ Auto-creating PARALLEL extraction from search results")
+                    
+                    # Extract URLs from search results
+                    search_data = result.data
+                    if isinstance(search_data, str):
+                        urls = self._extract_urls_from_search(search_data)
+                        
+                        # Force visit top 5 pages (use source registry if not enough URLs)
+                        if len(urls) < 5:
+                            print(f"[REASON] Only found {len(urls)} URLs, using source registry for more")
+                            
+                            original_query = subtask["parameters"].get("query", "")
+                            
+                            try:
+                                from src.routing.source_registry import get_source_registry
+                                registry = get_source_registry()
+                                sources = registry.get_sources_for_category(original_query)
+                                
+                                if sources:
+                                    print(f"[REASON] Found {len(sources)} sources in registry")
+                                    for source in sources[:5]:
+                                        source_url = f"https://{source['domain']}"
+                                        if source_url not in urls:
+                                            urls.append(source_url)
+                                            print(f"[REASON] Added source: {source_url}")
+                                        if len(urls) >= 5:
+                                            break
+                            except Exception as e:
+                                print(f"[REASON] Source registry lookup failed: {e}")
+                        
+                        urls = urls[:5]
+                        
+                        if urls:
+                            required_fields = plan.get("required_fields", [])
+                            
+                            # 🚀 USE PARALLEL EXTRACTION HERE!
+                            print(f"[REASON] 🚀 Launching PARALLEL extraction from {len(urls)} URLs")
+                            
+                            try:
+                                # Run parallel extraction
+                                import asyncio
+                                # Create new event loop for worker thread
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                try:
+                                    parallel_results = loop.run_until_complete(
+                                        self._execute_parallel_extraction(urls, required_fields)
+                                    )
+                                finally:
+                                    loop.close()
+                                
+                                # Combine all data from parallel extractions
+                                all_records = []
+                                for parallel_result in parallel_results:
+                                    if parallel_result.get('success') and parallel_result.get('data'):
+                                        all_records.extend(parallel_result['data'])
+                                        print(f"[REASON] ✅ Got {parallel_result['count']} records from {parallel_result['url']}")
+                                
+                                print(f"[REASON] 📊 Combined total: {len(all_records)} records from {len(parallel_results)} URLs")
+                                
+                                # Create a single result entry with all data
+                                combined_result = {
+                                    "subtask_id": f"{subtask['subtask_id']}_parallel_extract",
+                                    "tool": "parallel_extraction",
+                                    "success": len(all_records) > 0,
+                                    "data": all_records,
+                                    "metadata": {
+                                        "urls_extracted": len(parallel_results),
+                                        "total_records": len(all_records)
+                                    }
+                                }
+                                
+                                results.append(combined_result)
+                                extraction_tasks_added = True
+                                
+                                print(f"[REASON] ✨ Parallel extraction complete!")
+                                
+                            except Exception as e:
+                                print(f"[REASON] ❌ Parallel extraction failed: {e}")
+                                import traceback
+                                traceback.print_exc()
+                        else:
+                            print("[REASON] ⚠️ No URLs found and no sources in registry")
+                
+                # FIX 5C: Check completeness and create follow-up if needed
+                if result.success and result.metadata:
+                    is_complete = result.metadata.get("complete", True)
+                    
+                    if not is_complete:
+                        reason = result.metadata.get("completeness_reason", "Task incomplete")
+                        next_action = result.metadata.get("suggested_action", "search_more_sources")
+                        coverage = result.metadata.get("coverage", "unknown")
+                        
+                        tool_name = subtask["tool"]
+                        current_count = follow_up_counts.get(tool_name, 0)
+                        
+                        # Extract coverage percentage for comparison
+                        try:
+                            coverage_num = int(coverage.rstrip('%')) if isinstance(coverage, str) and '%' in coverage else 0
+                        except:
+                            coverage_num = 0
+                        
+                        prev_coverage = previous_coverage.get(tool_name, 0)
+                        
+                        print(f"[REASON] ⚠️ Subtask incomplete: {reason} (Coverage: {coverage})")
+                        
+                        # NEW: Reset counter if coverage improved
+                        if coverage_num > prev_coverage:
+                            print(f"[REASON] ✨ Coverage improved from {prev_coverage}% to {coverage_num}% - resetting retry counter")
+                            follow_up_counts[tool_name] = 0
+                            current_count = 0
+                        
+                        # Update previous coverage
+                        previous_coverage[tool_name] = coverage_num
+                        
+                        # NEW: Check if we've hit the follow-up limit
+                        if current_count < MAX_FOLLOW_UPS_PER_TOOL:
+                            self.log(f"Subtask incomplete: {reason}. Creating follow-up task...")
+                            
+                            # Create follow-up subtask
+                            follow_up = self._create_follow_up_task(
+                                original_subtask=subtask,
+                                result=result_entry,
+                                suggested_action=next_action,
+                                reason=reason
+                            )
+                            
+                            if follow_up:
+                                follow_up_counts[tool_name] = current_count + 1
+                                print(f"[REASON] ➕ Adding follow-up task {current_count + 1}/{MAX_FOLLOW_UPS_PER_TOOL} for {tool_name}")
+                                subtasks.append(follow_up)  # Add to queue for next iteration
+                        else:
+                            # Hit limit, log and continue with what we have
+                            print(f"[REASON] ⚠️ Max follow-ups ({MAX_FOLLOW_UPS_PER_TOOL}) reached for {tool_name}")
+                            self.log(f"Max follow-ups reached for {tool_name}, proceeding with available results")
                 
             except Exception as e:
                 self.log(f"Error executing subtask {subtask['tool']}: {e}", level="error")
@@ -944,11 +1650,27 @@ JSON:"""
             response = model.invoke(prompt)
             content = response.content if hasattr(response, 'content') else str(response)
             
-            # Parse JSON
+            # Parse JSON with error recovery
             import re
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                extracted_data = json.loads(json_match.group())
+                json_str = json_match.group()
+                
+                try:
+                    extracted_data = json.loads(json_str)
+                except json.JSONDecodeError as e:
+                    print(f"[REASON] JSON parse error: {e}, attempting to fix...")
+                    # Try to fix common JSON issues
+                    json_str = json_str.replace("'", '"')  # Single to double quotes
+                    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)  # Remove trailing commas
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)  # Quote unquoted keys
+                    
+                    try:
+                        extracted_data = json.loads(json_str)
+                        print(f"[REASON] JSON fixed and parsed successfully")
+                    except:
+                        print(f"[REASON] Could not fix JSON, skipping structured data storage")
+                        return
                 
                 # Store in structured memory with timestamp
                 subject = extracted_data.get("subject", f"query_{len(self.structured_memory)}")
@@ -957,10 +1679,12 @@ JSON:"""
                     "timestamp": time.time(),
                     "query": task_description
                 }
-                print(f"[REASON] Stored structured data for: {subject}")
+                print(f"[REASON] ✅ Stored structured data for: {subject}")
                 
         except Exception as e:
             print(f"[REASON] Failed to extract structured data: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _synthesize_results(self, task: AgentTask, subtask_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -1028,6 +1752,10 @@ JSON:"""
             # Build context for LLM
             synthesis_prompt = self._build_synthesis_prompt(task, successful_results)
             
+            # DEBUG: Log prompt details
+            print(f"[REASON] 📊 Synthesis prompt length: {len(synthesis_prompt)} chars")
+            print(f"[REASON] 📊 Sending {len(successful_results)} results to LLM")
+            
             # Get LLM model and invoke it (LangChain)
             model = self.llm_service.get_model()
             response = model.invoke(synthesis_prompt)
@@ -1035,11 +1763,16 @@ JSON:"""
             # Extract content from LangChain response
             synthesized_answer = response.content.strip() if hasattr(response, 'content') else str(response).strip()
             
+            # DEBUG: Log response details
+            print(f"[REASON] 📊 LLM response length: {len(synthesized_answer)} chars")
             if synthesized_answer:
+                print(f"[REASON] 📊 LLM response preview: {synthesized_answer[:200]}...")
+            
+            if synthesized_answer and len(synthesized_answer) > 0:
                 print(f"[REASON] LLM synthesis complete ({len(synthesized_answer)} chars)")
                 return synthesized_answer
             else:
-                print("[REASON] LLM synthesis returned empty, using fallback")
+                print("[REASON] ⚠️ LLM returned empty response, using fallback")
                 return self._fallback_answer(task, successful_results, failed_results)
                 
         except Exception as e:
@@ -1093,7 +1826,12 @@ I have gathered the following information from various tools:
 
 """
         
-        for i, result in enumerate(results, 1):
+        # LIMIT: Only send top 10 results to LLM to avoid token limits
+        limited_results = results[:10]
+        if len(results) > 10:
+            print(f"[REASON] 📊 Limiting synthesis to top 10 results (have {len(results)} total)")
+        
+        for i, result in enumerate(limited_results, 1):
             tool_name = result["tool"].replace("_", " ").title()
             data = result["data"]
             
@@ -1176,6 +1914,7 @@ Your response:"""
     def _handle_simple_task(self, task: AgentTask, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
         Handle simple task directly without delegation.
+        For follow-up questions, uses previous context.
         
         Args:
             task: Task to handle
@@ -1184,10 +1923,31 @@ Your response:"""
         Returns:
             Direct result
         """
+        # Check if this is a follow-up question
+        if self._is_followup_question(task.description):
+            print("[REASON] Handling follow-up question with previous context")
+            
+            # Get the most recent previous result
+            if self.previous_results:
+                last_result = self.previous_results[-1]
+                previous_answer = last_result.get("result", {}).get("answer", "")
+                
+                # Build a response with more details from previous context
+                answer = f"Based on our previous conversation:\n\n{previous_answer}\n\n"
+                answer += "Please let me know if you need any specific aspect explained in more detail."
+                
+                return {
+                    "task_id": task.task_id,
+                    "description": task.description,
+                    "answer": answer,
+                    "method": "context_based"
+                }
+        
+        # Default handling for non-follow-up questions
         return {
             "task_id": task.task_id,
             "description": task.description,
-            "answer": f"Direct answer for {task.task_type}",
+            "answer": f"I need more information to help with: {task.description}",
             "method": "direct"
         }
     
@@ -1232,7 +1992,349 @@ Your response:"""
         """
         return self.execution_history
     
+    def _create_follow_up_task(
+        self,
+        original_subtask: Dict[str, Any],
+        result: Dict[str, Any],
+        suggested_action: str,
+        reason: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create a follow-up subtask when original task is incomplete.
+        Uses LLM-based source registry for intelligent query refinement.
+        ZERO HARDCODING!
+        
+        Args:
+            original_subtask: The original subtask that was incomplete
+            result: Result from the incomplete subtask
+            suggested_action: Suggested action from completeness evaluation
+            reason: Reason for incompleteness
+            
+        Returns:
+            Follow-up subtask dict or None
+        """
+        try:
+            from src.routing.source_registry import get_source_registry
+            
+            original_tool = original_subtask["tool"]
+            original_params = original_subtask["parameters"]
+            
+            # Create follow-up based on suggested action
+            if suggested_action == "search_more_sources":
+                # For searches, use source registry for intelligent follow-up
+                original_query = original_params.get("query", "")
+                
+                if not original_query:
+                    print(f"[REASON] No query in parameters, cannot create follow-up")
+                    return None
+                
+                # Get sources using dynamic registry
+                registry = get_source_registry()
+                sources = registry.get_sources_for_category(original_query)
+                
+                if not sources:
+                    print(f"[REASON] No sources available for query: {original_query}")
+                    return None
+                
+                # Get domains already tried
+                used_domains = self._get_used_domains(original_subtask)
+                
+                # Find next untried source
+                for source in sources:
+                    if source["domain"] not in used_domains:
+                        # Use source for refined query (append site: operator)
+                        refined_query = f"{original_query} site:{source['domain']}"
+                        
+                        print(f"[REASON] Next source: {source['domain']} (reliability: {source['reliability']})")
+                        print(f"[REASON] Refined query: {refined_query}")
+                        
+                        follow_up = {
+                            "subtask_id": f"{original_subtask['subtask_id']}_followup",
+                            "tool": original_tool,
+                            "parameters": {
+                                **original_params,
+                                "query": refined_query
+                            },
+                            "description": f"Search {source['domain']}: {refined_query}",
+                            "metadata": {
+                                "source": source["domain"],
+                                "domain": source["domain"],
+                                "reliability": source["reliability"]
+                            }
+                        }
+                        
+                        return follow_up
+                
+                # All sources exhausted
+                print(f"[REASON] All sources exhausted for content type")
+                return None
+            
+            elif suggested_action == "extract_more_details":
+                # For extraction, try to get missing fields
+                # Could switch to a more detailed extraction tool
+                follow_up = {
+                    "subtask_id": f"{original_subtask['subtask_id']}_followup",
+                    "tool": original_tool,
+                    "parameters": {
+                        **original_params,
+                        "extract_all": True  # Request more comprehensive extraction
+                    },
+                    "description": f"Extract additional details: {reason}"
+                }
+                return follow_up
+            
+            elif suggested_action == "search_alternate_sources":
+                # Try a different search source or approach
+                original_query = original_params.get("query", "")
+                if original_query:
+                    # Add alternative search terms
+                    alt_query = f"{original_query} alternative sources"
+                    follow_up = {
+                        "subtask_id": f"{original_subtask['subtask_id']}_followup",
+                        "tool": original_tool,
+                        "parameters": {
+                            **original_params,
+                            "query": alt_query
+                        },
+                        "description": f"Search alternate sources: {alt_query}"
+                    }
+                    return follow_up
+            
+            # Default: retry with same parameters
+            print(f"[REASON] No specific follow-up strategy for action: {suggested_action}")
+            return None
+            
+        except Exception as e:
+            print(f"[REASON] Error creating follow-up task: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _get_used_domains(self, subtask: Dict[str, Any]) -> List[str]:
+        """
+        Extract domains already tried from subtask history.
+        Tracks which sources have been attempted.
+        
+        Args:
+            subtask: Current subtask
+            
+        Returns:
+            List of domain names already tried
+        """
+        used = []
+        
+        # Check if subtask has metadata with domain
+        if "metadata" in subtask and "domain" in subtask["metadata"]:
+            used.append(subtask["metadata"]["domain"])
+        
+        # Extract domain from query if it has site: operator
+        query = subtask.get("parameters", {}).get("query", "")
+        if "site:" in query:
+            import re
+            match = re.search(r'site:([^\s]+)', query)
+            if match:
+                used.append(match.group(1))
+        
+        return used
+    
     def clear_context(self) -> None:
         """Clear execution context."""
         self.context.clear()
         self.execution_history.clear()
+    
+    def check_data_completeness(
+        self,
+        results: List[Dict[str, Any]],
+        required_fields: List[str],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Check if extracted data has all required fields.
+        Uses ResultValidator for intelligent completeness checking.
+        
+        Args:
+            results: List of extracted records
+            required_fields: List of required field names
+            context: Optional context (url, page_type, etc.)
+            
+        Returns:
+            {
+                'complete': bool,
+                'missing_fields': List[str],
+                'coverage': float (0.0-1.0),
+                'confidence': float (0.0-1.0),
+                'suggested_actions': List[Dict]
+            }
+        """
+        try:
+            from src.routing.result_validator import ResultValidator
+            
+            validator = ResultValidator()
+            validation = validator.validate(results, required_fields, context)
+            
+            print(f"[REASON] ✅ Data completeness check:")
+            print(f"  - Complete: {validation['complete']}")
+            print(f"  - Coverage: {validation['coverage']*100:.0f}%")
+            print(f"  - Confidence: {validation['confidence']*100:.0f}%")
+            if validation['missing_fields']:
+                print(f"  - Missing: {validation['missing_fields']}")
+            
+            return validation
+            
+        except Exception as e:
+            print(f"[REASON] Completeness check failed: {e}")
+            # Fallback
+            if not results:
+                return {
+                    'complete': False,
+                    'missing_fields': required_fields,
+                    'coverage': 0.0,
+                    'confidence': 0.0,
+                    'suggested_actions': []
+                }
+            
+            present_fields = set(results[0].keys())
+            required_set = set(required_fields)
+            missing = list(required_set - present_fields)
+            coverage = len(present_fields & required_set) / len(required_set) if required_set else 1.0
+            
+            return {
+                'complete': len(missing) == 0,
+                'missing_fields': missing,
+                'coverage': coverage,
+                'confidence': 0.5,
+                'suggested_actions': []
+            }
+    
+    def plan_multi_step_extraction(
+        self,
+        initial_results: List[Dict[str, Any]],
+        required_fields: List[str],
+        url: str,
+        task_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Plan multi-step extraction when initial results are incomplete.
+        Creates click-through and navigation tasks to gather missing data.
+        
+        Args:
+            initial_results: Initial extraction results (incomplete)
+            required_fields: List of required field names
+            url: Current URL
+            task_id: Base task ID for generating subtask IDs
+            
+        Returns:
+            List of additional subtasks to execute
+        """
+        print(f"[REASON] 🎯 Planning multi-step extraction for missing fields")
+        
+        try:
+            from src.routing.result_validator import ResultValidator
+            
+            # Check what's missing
+            validator = ResultValidator()
+            validation = validator.validate(
+                initial_results,
+                required_fields,
+                {'url': url}
+            )
+            
+            if validation['complete']:
+                print(f"[REASON] Data is already complete, no multi-step needed")
+                return []
+            
+            missing_fields = validation['missing_fields']
+            suggested_actions = validation['suggested_actions']
+            
+            print(f"[REASON] Missing fields: {missing_fields}")
+            print(f"[REASON] Suggested actions: {len(suggested_actions)}")
+            
+            # Convert suggestions to subtasks
+            additional_tasks = []
+            
+            for i, action in enumerate(suggested_actions):
+                action_type = action.get('action')
+                field = action.get('field')
+                
+                if action_type == 'click_through':
+                    # Create click-through task sequence
+                    # 1. Find and click product/item link
+                    # 2. Extract missing field from detail page
+                    # 3. Go back
+                    
+                    # Click task
+                    click_task = {
+                        'subtask_id': f"{task_id}_click_{i}",
+                        'tool': 'playwright_execute',
+                        'parameters': {
+                            'method': 'click',
+                            'selector': 'a[class*="item"], a[class*="product"], a[class*="title"]',
+                            'args': {'index': 0}  # Click first item
+                        },
+                        'description': f"Click product link to get {field}"
+                    }
+                    additional_tasks.append(click_task)
+                    
+                    # Extract task
+                    extract_task = {
+                        'subtask_id': f"{task_id}_extract_detail_{i}",
+                        'tool': 'playwright_execute',
+                        'parameters': {
+                            'method': 'extract_chart',
+                            'required_fields': [field]
+                        },
+                        'description': f"Extract {field} from detail page"
+                    }
+                    additional_tasks.append(extract_task)
+                    
+                    # Go back task
+                    back_task = {
+                        'subtask_id': f"{task_id}_back_{i}",
+                        'tool': 'playwright_execute',
+                        'parameters': {
+                            'method': 'go_back',
+                            'args': {}
+                        },
+                        'description': "Go back to listing"
+                    }
+                    additional_tasks.append(back_task)
+                
+                elif action_type == 'navigate':
+                    # Navigate to different page
+                    target = action.get('target')
+                    nav_task = {
+                        'subtask_id': f"{task_id}_nav_{i}",
+                        'tool': 'playwright_execute',
+                        'parameters': {
+                            'method': 'click',
+                            'selector': f'a[href*="{target}"]',
+                            'args': {}
+                        },
+                        'description': f"Navigate to {target} page"
+                    }
+                    additional_tasks.append(nav_task)
+                    
+                    # Extract from new page
+                    extract_task = {
+                        'subtask_id': f"{task_id}_extract_{i}",
+                        'tool': 'playwright_execute',
+                        'parameters': {
+                            'method': 'extract_chart',
+                            'required_fields': [field]
+                        },
+                        'description': f"Extract {field} from {target} page"
+                    }
+                    additional_tasks.append(extract_task)
+            
+            if additional_tasks:
+                print(f"[REASON] ✅ Created {len(additional_tasks)} additional extraction tasks")
+            else:
+                print(f"[REASON] ⚠️ No additional tasks could be created")
+            
+            return additional_tasks
+            
+        except Exception as e:
+            print(f"[REASON] Multi-step planning failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return []

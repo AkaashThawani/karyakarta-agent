@@ -1,0 +1,16 @@
+{
+  "playwright_execute": {
+    "search_input": {
+      "best": null,
+      "selectors": {
+        "#cli_shellHeaderSearchInput": {
+          "success": 1,
+          "fail": 0,
+          "last_used": 1761801223.5187294,
+          "avg_response_time": 0.053572893142700195
+        }
+      },
+      "fallbacks": []
+    }
+  }
+}

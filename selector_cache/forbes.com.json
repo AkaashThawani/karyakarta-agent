@@ -1,0 +1,347 @@
+{
+  "site_intelligence": {
+    "url": "https://www.forbes.com/sites/lewisnunn/2025/07/25/where-travelers-are-going--according-to-travel-site-research/",
+    "learned_at": "2025-10-30T01:46:31.337556",
+    "total_elements_found": 150,
+    "classified_elements": 100,
+    "discovered_types": [
+      {
+        "type_name": "action_buttons",
+        "description": "Clickable buttons",
+        "importance": "high",
+        "element_indices": [
+          45,
+          50
+        ]
+      },
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          9,
+          16,
+          18,
+          33,
+          49,
+          63,
+          75,
+          100,
+          125
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "UL._3XBIQGxd > LI.U40pFDrj",
+        "count": 212,
+        "sample": {
+          "text": "CEO Network",
+          "selector": "LI.U40pFDrj"
+        },
+        "selectors": {
+          "first": "LI.U40pFDrj:first-of-type",
+          "last": "LI.U40pFDrj:last-of-type",
+          "nth": "LI.U40pFDrj:nth-of-type({n})",
+          "all": "LI.U40pFDrj"
+        }
+      },
+      {
+        "pattern": "LI.U40pFDrj > A",
+        "count": 212,
+        "sample": {
+          "text": "CEO Network",
+          "selector": "A"
+        },
+        "selectors": {
+          "first": "A:first-of-type",
+          "last": "A:last-of-type",
+          "nth": "A:nth-of-type({n})",
+          "all": "A"
+        }
+      },
+      {
+        "pattern": "UL.collapsed > LI.QpfB0oZe",
+        "count": 164,
+        "sample": {
+          "text": "Breaking News",
+          "selector": "LI.QpfB0oZe"
+        },
+        "selectors": {
+          "first": "LI.QpfB0oZe:first-of-type",
+          "last": "LI.QpfB0oZe:last-of-type",
+          "nth": "LI.QpfB0oZe:nth-of-type({n})",
+          "all": "LI.QpfB0oZe"
+        }
+      },
+      {
+        "pattern": "LI.QpfB0oZe > DIV.suOjX7vq",
+        "count": 164,
+        "sample": {
+          "text": "Breaking News",
+          "selector": "DIV.suOjX7vq"
+        },
+        "selectors": {
+          "first": "DIV.suOjX7vq:first-of-type",
+          "last": "DIV.suOjX7vq:last-of-type",
+          "nth": "DIV.suOjX7vq:nth-of-type({n})",
+          "all": "DIV.suOjX7vq"
+        }
+      },
+      {
+        "pattern": "DIV.suOjX7vq > A",
+        "count": 164,
+        "sample": {
+          "text": "Breaking News",
+          "selector": "A"
+        },
+        "selectors": {
+          "first": "A:first-of-type",
+          "last": "A:last-of-type",
+          "nth": "A:nth-of-type({n})",
+          "all": "A"
+        }
+      },
+      {
+        "pattern": "svg.fs-icon > path",
+        "count": 59,
+        "sample": {
+          "text": "",
+          "selector": "path"
+        },
+        "selectors": {
+          "first": "path:first-of-type",
+          "last": "path:last-of-type",
+          "nth": "path:nth-of-type({n})",
+          "all": "path"
+        }
+      },
+      {
+        "pattern": "HEAD > SCRIPT",
+        "count": 38,
+        "sample": {
+          "text": "",
+          "selector": "SCRIPT"
+        },
+        "selectors": {
+          "first": "SCRIPT:first-of-type",
+          "last": "SCRIPT:last-of-type",
+          "nth": "SCRIPT:nth-of-type({n})",
+          "all": "SCRIPT"
+        }
+      },
+      {
+        "pattern": "HEAD > META",
+        "count": 34,
+        "sample": {
+          "text": "",
+          "selector": "META"
+        },
+        "selectors": {
+          "first": "META:first-of-type",
+          "last": "META:last-of-type",
+          "nth": "META:nth-of-type({n})",
+          "all": "META"
+        }
+      },
+      {
+        "pattern": "DIV.suOjX7vq > DIV.BmefNpol",
+        "count": 32,
+        "sample": {
+          "text": "",
+          "selector": "DIV.BmefNpol"
+        },
+        "selectors": {
+          "first": "DIV.BmefNpol:first-of-type",
+          "last": "DIV.BmefNpol:last-of-type",
+          "nth": "DIV.BmefNpol:nth-of-type({n})",
+          "all": "DIV.BmefNpol"
+        }
+      },
+      {
+        "pattern": "DIV.BmefNpol > svg.fs-icon",
+        "count": 32,
+        "sample": {
+          "text": "",
+          "selector": "svg.fs-icon"
+        },
+        "selectors": {
+          "first": "svg.fs-icon:first-of-type",
+          "last": "svg.fs-icon:last-of-type",
+          "nth": "svg.fs-icon:nth-of-type({n})",
+          "all": "svg.fs-icon"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html > body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "div_element": {
+        "selector": "div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > figure.embed-base.image-embed.embed-22 > div > div.bMqrj > div.Jp--BF7-",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "header_element": {
+        "selector": "body > div > div.LBhHB > div._5OuWW.cm8GT.Oz7zH > header._5jL4nbZg.uwWid._7BD1t",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: header tag"
+      },
+      "link_nav": {
+        "selector": "main._4tKaI.color-body.bg-base > div.cO11L.OtGY6 > div._4WHtY.yy6WL > div.DmYs_ > a.IE1a1.KAXdG",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "article_element": {
+        "selector": "#article-stream-0",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: article tag"
+      },
+      "main_element": {
+        "selector": "body > div > div.LBhHB > article.current-page.content_6883370851e7aa2223e60949 > main._4tKaI.color-body.bg-base",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: main tag"
+      },
+      "span_element": {
+        "selector": "figure.embed-base.image-embed.embed-22 > div > div.bMqrj > div.Jp--BF7- > span.Ccg9Ib-7._8XF2kHYM",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "link_lifestyle": {
+        "selector": "div.hY7q0 > div.HUZQQ.UzIGW > div._8cjw-SPU.cB20L.undefined > span._6Q2IDc-r > a.isDg-4PG",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_travel": {
+        "selector": "div.hY7q0 > div.HUZQQ.UzIGW > div._8cjw-SPU.cB20L.undefined > span._6Q2IDc-r > a.isDg-4PG._2XNbdi6I",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "h1_element": {
+        "selector": "div.h9nLs.headline-embed > div.cxkrv > div.HQYQR > div.FBQIu.fROHd > h1.speakable-headline.color-base.aY5Zr",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h1 tag"
+      },
+      "p_element": {
+        "selector": "div.p5_3X.fs-premium > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > p",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "link_lewis_nunn": {
+        "selector": "div._9GOxm > span.Ccg9Ib-7.Msqbf.CRVMw > div.Na3NTglQ._51GWpoAk.CF_dd > p.ujvJmzbB.LfmqX > a._4tin10wS._9xFYp.YbfXuVMn",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "time_element": {
+        "selector": "article.current-page.content_6883370851e7aa2223e60949 > main._4tKaI.color-body.bg-base > div.cO11L.OtGY6 > div.v8jKF > time.ycHdAQ4U.UcPtB",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: time tag"
+      },
+      "button_share": {
+        "selector": "div.cO11L.OtGY6 > div._4WHtY.yy6WL > div.rwK2G > div.socialShareContainer > button.sTVDLFT0.AYwaD.CKkMh.KAXdG._7dB3-wXa",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "button_": {
+        "selector": "main._4tKaI.color-body.bg-base > div.cO11L.OtGY6 > div._4WHtY.yy6WL > div.DmYs_ > button.mbEyX",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "figure_element": {
+        "selector": "div.p5_3X.fs-premium > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > figure.embed-base.image-embed.embed-22",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: figure tag"
+      },
+      "small_element": {
+        "selector": "div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > figure.embed-base.image-embed.embed-22 > div > div.bMqrj > small.pGGCM2aD",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: small tag"
+      },
+      "abbr_element": {
+        "selector": "div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > p > abbr.drop-cap.color-accent.font-accent",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: abbr tag"
+      },
+      "link_go2africa": {
+        "selector": "div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > p > a.color-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "em_element": {
+        "selector": "div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > p > em",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: em tag"
+      },
+      "h2_element": {
+        "selector": "div.p5_3X.fs-premium > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > h2.subhead-embed.color-accent.bg-base.font-accent.font-size.text-align",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h2 tag"
+      },
+      "h3_element": {
+        "selector": "div.p5_3X.fs-premium > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > h3.subhead3-embed.color-body.bg-base.font-accent.font-size.text-align",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h3 tag"
+      },
+      "link_forbesthe_world\u2019s_best_river_c": {
+        "selector": "div.p5_3X.fs-premium > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead > div.b6Cr_.article-body-container > div.fs-article.fs-premium.fs-responsive-text.current-article.font-body.color-body.bg-base.font-accent.article-subtype__masthead.article-body.premium-container > a.embed-base.color-body.color-body-border.link-embed.embed-174",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

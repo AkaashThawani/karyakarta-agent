@@ -1,0 +1,393 @@
+{
+  "site_intelligence": {
+    "url": "https://www.cnn.com/2025/10/14/travel/travel-news-most-powerful-passports",
+    "learned_at": "2025-10-30T01:44:43.286957",
+    "total_elements_found": 150,
+    "classified_elements": 100,
+    "discovered_types": [
+      {
+        "type_name": "action_buttons",
+        "description": "Clickable buttons",
+        "importance": "high",
+        "element_indices": [
+          14,
+          30,
+          31,
+          35,
+          65
+        ]
+      },
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          15,
+          16,
+          18,
+          20,
+          22,
+          24,
+          26,
+          28,
+          29,
+          39
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "UL.subnav__subsections > LI.subnav__subsection",
+        "count": 213,
+        "sample": {
+          "text": "Crime + Justice",
+          "selector": "LI.subnav__subsection"
+        },
+        "selectors": {
+          "first": "LI.subnav__subsection:first-of-type",
+          "last": "LI.subnav__subsection:last-of-type",
+          "nth": "LI.subnav__subsection:nth-of-type({n})",
+          "all": "LI.subnav__subsection"
+        }
+      },
+      {
+        "pattern": "LI.subnav__subsection > A.subnav__subsection-link",
+        "count": 213,
+        "sample": {
+          "text": "Crime + Justice",
+          "selector": "A.subnav__subsection-link"
+        },
+        "selectors": {
+          "first": "A.subnav__subsection-link:first-of-type",
+          "last": "A.subnav__subsection-link:last-of-type",
+          "nth": "A.subnav__subsection-link:nth-of-type({n})",
+          "all": "A.subnav__subsection-link"
+        }
+      },
+      {
+        "pattern": "PICTURE.image__picture > SOURCE",
+        "count": 100,
+        "sample": {
+          "text": "",
+          "selector": "SOURCE"
+        },
+        "selectors": {
+          "first": "SOURCE:first-of-type",
+          "last": "SOURCE:last-of-type",
+          "nth": "SOURCE:nth-of-type({n})",
+          "all": "SOURCE"
+        }
+      },
+      {
+        "pattern": "HEAD > LINK",
+        "count": 45,
+        "sample": {
+          "text": "",
+          "selector": "LINK"
+        },
+        "selectors": {
+          "first": "LINK:first-of-type",
+          "last": "LINK:last-of-type",
+          "nth": "LINK:nth-of-type({n})",
+          "all": "LINK"
+        }
+      },
+      {
+        "pattern": "UL.subnav__sections > LI.subnav__section",
+        "count": 42,
+        "sample": {
+          "text": "US\n      \n      \n        \n          \n            C",
+          "selector": "LI.subnav__section"
+        },
+        "selectors": {
+          "first": "LI.subnav__section:first-of-type",
+          "last": "LI.subnav__section:last-of-type",
+          "nth": "LI.subnav__section:nth-of-type({n})",
+          "all": "LI.subnav__section"
+        }
+      },
+      {
+        "pattern": "LI.subnav__section > A.subnav__section-link",
+        "count": 42,
+        "sample": {
+          "text": "US",
+          "selector": "A.subnav__section-link"
+        },
+        "selectors": {
+          "first": "A.subnav__section-link:first-of-type",
+          "last": "A.subnav__section-link:last-of-type",
+          "nth": "A.subnav__section-link:nth-of-type({n})",
+          "all": "A.subnav__section-link"
+        }
+      },
+      {
+        "pattern": "LI.subnav__section > UL.subnav__subsections",
+        "count": 42,
+        "sample": {
+          "text": "Crime + Justice",
+          "selector": "UL.subnav__subsections"
+        },
+        "selectors": {
+          "first": "UL.subnav__subsections:first-of-type",
+          "last": "UL.subnav__subsections:last-of-type",
+          "nth": "UL.subnav__subsections:nth-of-type({n})",
+          "all": "UL.subnav__subsections"
+        }
+      },
+      {
+        "pattern": "HEAD > META",
+        "count": 30,
+        "sample": {
+          "text": "",
+          "selector": "META"
+        },
+        "selectors": {
+          "first": "META:first-of-type",
+          "last": "META:last-of-type",
+          "nth": "META:nth-of-type({n})",
+          "all": "META"
+        }
+      },
+      {
+        "pattern": "HEAD > SCRIPT",
+        "count": 23,
+        "sample": {
+          "text": "window.env={\"ADFUEL_BUSINESS_SRC\":[\"/media/sites/j",
+          "selector": "SCRIPT"
+        },
+        "selectors": {
+          "first": "SCRIPT:first-of-type",
+          "last": "SCRIPT:last-of-type",
+          "nth": "SCRIPT:nth-of-type({n})",
+          "all": "SCRIPT"
+        }
+      },
+      {
+        "pattern": "DIV.article__content > P.paragraph-elevate",
+        "count": 23,
+        "sample": {
+          "text": "What makes a passport \u201cpowerful\u201d? Well, a clear me",
+          "selector": "P.paragraph-elevate"
+        },
+        "selectors": {
+          "first": "P.paragraph-elevate:first-of-type",
+          "last": "P.paragraph-elevate:last-of-type",
+          "nth": "P.paragraph-elevate:nth-of-type({n})",
+          "all": "P.paragraph-elevate"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html.userconsent-cntry-us.userconsent-state-wa.userconsent-reg-global",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html.userconsent-cntry-us.userconsent-state-wa.userconsent-reg-global > body.layout-article-elevate.article_elevate_medium.travel_elevate",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "header_element": {
+        "selector": "div.article__content-container > div.article__content > div.related-content-elevate.related-content--article > a.related-content__link > header.related-content__title.related-content__title-text",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: header tag"
+      },
+      "div_element": {
+        "selector": "div.article__content > div.related-content-elevate.related-content--article > a.related-content__link > section.related-content__body > div.related-content__image.image__related-content",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "nav_element": {
+        "selector": "div.header__subnav-mount > div.header__container > div.header__right.header__right--domestic > div.header__user-account-nav-icon.header__user-account-nav-desktop > nav.user-account-nav.user-account-nav--subscriptions.user-account-nav--unauth",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: nav tag"
+      },
+      "button_": {
+        "selector": "section.layout__main.layout-article-elevate__main > section.layout__left.layout-article-elevate__left.tabcontent.active > div.action-bar > div.action-bar__buttons > button.action-bar__button",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "link_nav": {
+        "selector": "div.header__subnav-mount > div.header__container > div.header__left > div.brand-logo > a.brand-logo__theme-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_destinations": {
+        "selector": "div.header__left > nav.header__nav > div.header__nav-container > div.header__nav-item > a.header__nav-item-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_food_&_drink": {
+        "selector": "div.header__left > nav.header__nav > div.header__nav-container > div.header__nav-item > a.header__nav-item-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_news": {
+        "selector": "div.header__left > nav.header__nav > div.header__nav-container > div.header__nav-item > a.header__nav-item-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_stay": {
+        "selector": "div.header__left > nav.header__nav > div.header__nav-container > div.header__nav-item > a.header__nav-item-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_video": {
+        "selector": "div.header__left > nav.header__nav > div.header__nav-container > div.header__nav-item > a.header__nav-item-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_watch": {
+        "selector": "div.header__inner.header__inner--subscription > div.header__subnav-mount > div.header__container > div.header__right.header__right--domestic > a.header__video-link.header__video-link-desktop.header__video-link--domestic",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_listen": {
+        "selector": "div.header__inner.header__inner--subscription > div.header__subnav-mount > div.header__container > div.header__right.header__right--domestic > a.header__audio-link.header__audio-link-desktop.header__audio-link-desktop--domestic",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "button_subscribe": {
+        "selector": "#headerSubscribeButton",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "button_sign_in": {
+        "selector": "div.header__right.header__right--domestic > div.header__user-account-nav-icon.header__user-account-nav-desktop > nav.user-account-nav.user-account-nav--subscriptions.user-account-nav--unauth > div.user-account-nav__icons > button.user-account-nav__text-button.user-account-nav__text-button--unauth.userAccountButton.user-account-nav__text-button--domestic",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "section_element": {
+        "selector": "div.article__content-container > div.article__content > div.related-content-elevate.related-content--article > a.related-content__link > section.related-content__body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: section tag"
+      },
+      "link_travel": {
+        "selector": "body.layout-article-elevate.article_elevate_medium.travel_elevate > div.layout-article-elevate__content-wrapper.layout__content-wrapper > section.layout-article-elevate__breadcrumb > div.breadcrumb-elevate.vossi-breadcrumb\n.breadcrumb__margin-article\n > a.breadcrumb__link.vossi-breadcrumb__link.breadcrumb__parent-link.vossi-breadcrumb__parent-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_travel_news": {
+        "selector": "body.layout-article-elevate.article_elevate_medium.travel_elevate > div.layout-article-elevate__content-wrapper.layout__content-wrapper > section.layout-article-elevate__breadcrumb > div.breadcrumb-elevate.vossi-breadcrumb\n.breadcrumb__margin-article\n > a.breadcrumb__link.vossi-breadcrumb__link.breadcrumb__child-link.vossi-breadcrumb__child-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "span_element": {
+        "selector": "div.gallery-inline__metadata-wrapper.media__metadata-wrapper > div.gallery-inline__metadata-container.media__metadata-container > div.gallery-inline__metadata > div.gallery-inline__caption.attribution.media__metadata > span.inline-placeholder",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "h1_element": {
+        "selector": "#maincontent",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h1 tag"
+      },
+      "link_function_imageloaderror(img)_{": {
+        "selector": "div.headline__sub-text > div.vossi-byline_elevate.byline-elevate > div.byline__authors.vossi-byline_elevate__authors > div.byline__author.vossi-byline_elevate__author > a.byline__image-link.vossi-byline_elevate__link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_maureen_o'hare": {
+        "selector": "div.headline__sub-text > div.vossi-byline_elevate.byline-elevate > div.byline__authors.vossi-byline_elevate__authors > div.byline__author.vossi-byline_elevate__author > a.byline__link.vossi-byline_elevate__link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "article_element": {
+        "selector": "div.layout-article-elevate__content-wrapper.layout__content-wrapper > section.layout__wrapper.layout-article-elevate__wrapper > section.layout__main.layout-article-elevate__main > section.layout__center.layout-article-elevate__center > article.article",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: article tag"
+      },
+      "main_element": {
+        "selector": "section.layout__main.layout-article-elevate__main > section.layout__center.layout-article-elevate__center > article.article > section.body.tabcontent.active > main.article__main",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: main tag"
+      },
+      "strong_element": {
+        "selector": "div.gallery-inline__metadata-container.media__metadata-container > div.gallery-inline__metadata > div.gallery-inline__caption.attribution.media__metadata > span.inline-placeholder > strong",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: strong tag"
+      },
+      "figcaption_element": {
+        "selector": "div.gallery-inline__metadata-wrapper.media__metadata-wrapper > div.gallery-inline__metadata-container.media__metadata-container > div.gallery-inline__metadata > div.gallery-inline__caption.attribution.media__metadata > figcaption.gallery-inline__credit",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: figcaption tag"
+      },
+      "p_element": {
+        "selector": "section.body.tabcontent.active > main.article__main > div.article__content-container > div.article__content > p.paragraph-elevate.inline-placeholder.vossi-paragraph",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "link_henley_passport_index": {
+        "selector": "main.article__main > div.article__content-container > div.article__content > p.paragraph-elevate.inline-placeholder.vossi-paragraph > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_related_article\n__\n____\n______": {
+        "selector": "main.article__main > div.article__content-container > div.article__content > div.related-content-elevate.related-content--article > a.related-content__link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

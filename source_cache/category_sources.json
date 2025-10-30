@@ -1,0 +1,102 @@
+{
+  "categories": {
+    "music_charts": {
+      "canonical_name": "music_charts",
+      "description": "Top music charts and song rankings",
+      "aliases": [
+        "songs",
+        "top_songs",
+        "song_charts",
+        "music",
+        "hit_songs"
+      ],
+      "keywords": [
+        "song",
+        "artist",
+        "music",
+        "chart",
+        "album",
+        "track"
+      ],
+      "websites": [
+        {
+          "domain": "spotify.com",
+          "url": "https://charts.spotify.com/",
+          "fields": [
+            "song",
+            "artist",
+            "rank"
+          ],
+          "priority": 1,
+          "reliability": 0.95,
+          "added_at": "2025-10-29T18:00:00Z"
+        },
+        {
+          "domain": "billboard.com",
+          "url": "https://www.billboard.com/charts/hot-100/",
+          "fields": [
+            "song",
+            "artist",
+            "producer",
+            "release_date"
+          ],
+          "priority": 2,
+          "reliability": 0.9,
+          "added_at": "2025-10-29T18:00:00Z"
+        }
+      ],
+      "required_fields": [
+        "song",
+        "artist"
+      ],
+      "created_at": "2025-10-29T18:00:00Z",
+      "updated_at": "2025-10-29T18:00:00Z"
+    },
+    "books": {
+      "canonical_name": "books",
+      "description": "Book rankings and bestsellers",
+      "aliases": [
+        "book",
+        "bestsellers",
+        "reading"
+      ],
+      "keywords": [
+        "book",
+        "author",
+        "publisher",
+        "isbn"
+      ],
+      "websites": [
+        {
+          "domain": "nytimes.com",
+          "url": "https://www.nytimes.com/books/best-sellers/",
+          "fields": [
+            "title",
+            "author",
+            "rank"
+          ],
+          "priority": 1,
+          "reliability": 0.98,
+          "added_at": "2025-10-29T18:00:00Z"
+        }
+      ],
+      "required_fields": [
+        "title",
+        "author"
+      ],
+      "created_at": "2025-10-29T18:00:00Z",
+      "updated_at": "2025-10-29T18:00:00Z"
+    }
+  },
+  "category_mappings": {
+    "songs": "music_charts",
+    "top_songs": "music_charts",
+    "song_charts": "music_charts",
+    "music": "music_charts",
+    "hit_songs": "music_charts",
+    "book": "books",
+    "bestsellers": "books",
+    "reading": "books"
+  },
+  "last_updated": "2025-10-29T18:00:00Z"
+}

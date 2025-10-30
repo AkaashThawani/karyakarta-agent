@@ -8,9 +8,11 @@ agent tools. This allows the agent to use the full Playwright API dynamically.
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
+from urllib.parse import urlparse
 from src.tools.base import BaseTool, ToolResult
 from src.services.logging_service import LoggingService
 from src.routing.selector_map import get_selector_map
+from src.tools.element_parser import ElementParser
 import asyncio
 import threading
 import json
@@ -73,6 +75,7 @@ class UniversalPlaywrightTool(BaseTool):
         self.session_id = session_id
         self.settings = settings
         self.browserless_token = os.getenv("BROWSERLESS_API_KEY", "")
+        self._last_url = None  # Track URL changes for auto-learning
         
         # Initialize persistent event loop for this session
         if session_id not in UniversalPlaywrightTool._event_loops:
@@ -206,18 +209,129 @@ class UniversalPlaywrightTool(BaseTool):
                 metadata={}
             )
         
-        # Resolve selector from hint if provided
+        # WATERFALL SELECTOR RESOLUTION
+        # 1. Check cache → 2. Element Parser → 3. Site Intelligence (LLM fallback)
         if selector_hint and not selector:
             print(f"[PLAYWRIGHT] Resolving selector hint: {selector_hint}")
             selector_map = get_selector_map()
-            selectors = selector_map.get_selectors(selector_hint)
             
-            if not selectors:
-                print(f"[PLAYWRIGHT] No selectors found for hint '{selector_hint}', using hint as-is")
-                selector = selector_hint
+            # Get URL from page if not explicitly provided
+            if not url and self._page:
+                url = self._page.url
+                print(f"[PLAYWRIGHT] Using current page URL: {url}")
+            
+            # STEP 1: Check cache (O(1) lookup)
+            if url:
+                best_selector = selector_map.get_selector(url, "playwright_execute", selector_hint)
+                
+                if best_selector:
+                    print(f"[PLAYWRIGHT] ✅ [CACHE] Found selector for {selector_hint}: {best_selector}")
+                    selector = best_selector
+                else:
+                    # STEP 2: Try Element Parser (heuristic, fast, no LLM)
+                    print(f"[PLAYWRIGHT] 🔍 [PARSER] Using ElementParser for {selector_hint}...")
+                    
+                    try:
+                        # Parse page HTML
+                        html = self.run_async(self._page.content()) # pyright: ignore[reportOptionalMemberAccess]
+                        parser = ElementParser()
+                        elements = parser.parse_page(html)
+                        
+                        print(f"[PLAYWRIGHT] Extracted {len(elements)} interactive elements")
+                        
+                        # Find matching element
+                        match = parser.find_element(elements, selector_hint)
+                        
+                        if match:
+                            selector = match['selector']
+                            print(f"[PLAYWRIGHT] ✅ [PARSER] Found selector: {selector}")
+                            
+                            # Cache for future use
+                            parsed = urlparse(url) # pyright: ignore[reportUnboundVariable]
+                            domain = parsed.netloc or parsed.path
+                            if domain.startswith('www.'):
+                                domain = domain[4:]
+                            path = parsed.path or "/"
+                            
+                            selector_map.save_page_action_selector(domain, path, selector_hint, selector)
+                            
+                            # Also save elements for tree building
+                            selector_map.save_page_elements(domain, path, url, elements)
+                        else:
+                            # STEP 3: Site Intelligence (LLM fallback)
+                            print(f"[PLAYWRIGHT] ⚠️ [PARSER] No match, falling back to Site Intelligence...")
+                    except Exception as parser_error:
+                        print(f"[PLAYWRIGHT] Element Parser error: {parser_error}")
+                    
+                    # If parser didn't find anything, try Site Intelligence
+                    if not selector or selector == selector_hint:
+                        try:
+                            # Import Site Intelligence Tool
+                            from src.tools.site_intelligence import SiteIntelligenceTool
+                            from src.services.llm_service import LLMService
+                            from src.core.config import settings
+                            
+                            # Initialize Site Intelligence
+                            intelligence = SiteIntelligenceTool(self.session_id, self.logger)
+                            
+                            # Get LLM service with settings
+                            llm_service = LLMService(settings)
+                            
+                            # Learn site structure
+                            print(f"[PLAYWRIGHT] Learning site structure for {url}...")
+                            schema = self.run_async(intelligence.learn_site(url, self._page, llm_service))
+                            
+                            # Try to get selector from learned schema
+                            parsed_url = urlparse(url) # pyright: ignore[reportUnboundVariable]
+                            domain = parsed_url.netloc or parsed_url.path
+                            if domain.startswith('www.'):
+                                domain = domain[4:]
+                            
+                            learned_selector = intelligence.get_element_selector(domain, selector_hint)
+                            
+                            if learned_selector:
+                                print(f"[PLAYWRIGHT] ✅ [LLM] Learned selector: {learned_selector}")
+                                selector = learned_selector
+                            else:
+                                print(f"[PLAYWRIGHT] ⚠️ [LLM] Couldn't find selector for '{selector_hint}'")
+                                # Fall back to using hint as-is
+                                selector = selector_hint
+                                
+                        except Exception as e:
+                            print(f"[PLAYWRIGHT] Site Intelligence failed: {e}")
+                            # Fall back to using hint as-is
+                            selector = selector_hint
             else:
-                # Will try multiple selectors with adaptive retry
-                selector = selectors  # Pass list to try sequentially
+                # No URL provided, use backward compatible method
+                selectors = selector_map.get_selectors(selector_hint)
+                if selectors:
+                    selector = selectors
+                else:
+                    selector = selector_hint
+        
+        # AUTO-LEARNING: Even with direct selector, check if site is in map
+        # If site is unmapped, trigger Site Intelligence to learn it
+        if selector and not selector_hint:
+            # Get URL from page if not explicitly provided
+            current_url = url if url else (self._page.url if self._page else None)
+            
+            if current_url:
+                from urllib.parse import urlparse
+                parsed = urlparse(current_url)
+                domain = parsed.netloc or parsed.path
+                if domain.startswith('www.'):
+                    domain = domain[4:]
+                
+                # Check if domain exists in selector map
+                selector_map = get_selector_map()
+                
+                # Check if we have any cached data for this domain
+                cache_file = selector_map.cache_dir / f"{domain}.json"
+                
+                if not cache_file.exists():
+                    # DISABLED: Site Intelligence auto-learning
+                    # TODO: Re-enable after fixing "Extra data" JSON parsing
+                    print(f"[PLAYWRIGHT] ⚠️ Site Intelligence disabled - skipping auto-learn for '{domain}'")
         
         if self.logger:
             self.logger.status(f"Executing Playwright method: {method}")
@@ -276,25 +390,50 @@ class UniversalPlaywrightTool(BaseTool):
             if "url" not in args:
                 args = {"url": url, **args}
         
-        # Adaptive retry logic for selector-based methods
+        # Adaptive retry logic for selector-based methods with learning
         if selector and isinstance(selector, list):
             # Try each selector in the list with SHORT timeout
             last_error = None
+            import time
+            
             for i, sel in enumerate(selector):
                 try:
                     print(f"[PLAYWRIGHT] Trying selector {i+1}/{len(selector)}: {sel}")
+                    start_time = time.time()
+                    
                     # Use 3 second timeout for each selector attempt
                     result = await self._call_page_method(method, sel, args, url, timeout=3000)
                     
-                    # Success! Promote this selector in the map
-                    if selector_hint:
+                    response_time = time.time() - start_time
+                    
+                    # Success! Promote this selector in the map with site-specific learning
+                    if selector_hint and url:
                         selector_map = get_selector_map()
-                        selector_map.promote_selector(selector_hint, sel)
-                        print(f"[PLAYWRIGHT] ✅ Selector worked! Promoted '{sel}' for hint '{selector_hint}'")
+                        selector_map.promote_selector(
+                            url=url,
+                            tool="playwright_execute",
+                            hint=selector_hint,
+                            selector=sel,
+                            success=True,
+                            response_time=response_time
+                        )
+                        print(f"[PLAYWRIGHT] ✅ Selector worked! Promoted '{sel}' for {url}/{selector_hint} (took {response_time:.2f}s)")
                     
                     return result
                 except Exception as e:
                     print(f"[PLAYWRIGHT] ❌ Selector {i+1} failed: {sel}")
+                    
+                    # Record failure if we have URL and hint
+                    if selector_hint and url:
+                        selector_map = get_selector_map()
+                        selector_map.promote_selector(
+                            url=url,
+                            tool="playwright_execute",
+                            hint=selector_hint,
+                            selector=sel,
+                            success=False
+                        )
+                    
                     last_error = e
                     continue
             
@@ -302,7 +441,25 @@ class UniversalPlaywrightTool(BaseTool):
             raise Exception(f"All {len(selector)} selectors failed. Last error: {str(last_error)}")
         else:
             # Single selector or no selector - use default timeout (30s)
+            import time
+            start_time = time.time()
+            
             result = await self._call_page_method(method, selector, args, url)
+            
+            # Record success for single selector
+            if selector_hint and url and isinstance(selector, str):
+                response_time = time.time() - start_time
+                selector_map = get_selector_map()
+                selector_map.promote_selector(
+                    url=url,
+                    tool="playwright_execute",
+                    hint=selector_hint,
+                    selector=selector,
+                    success=True,
+                    response_time=response_time
+                )
+                print(f"[PLAYWRIGHT] ✅ Recorded success for '{selector}' on {url}/{selector_hint}")
+            
             return result
     
     async def _ensure_browser(self):
@@ -326,15 +483,20 @@ class UniversalPlaywrightTool(BaseTool):
                     )
                     cdp_url = None  # Remote browser, no local CDP
                 else:
-                    print(f"[PLAYWRIGHT] Using local Chromium with CDP")
+                    # Read HEADLESS from environment (default to True for production)
+                    headless_mode = os.getenv("HEADLESS", "true").lower() == "true"
+                    print(f"[PLAYWRIGHT] Using local Chromium with CDP (headless={headless_mode})")
                     self._browser = await playwright.chromium.launch(
-                        headless=False,
+                        headless=headless_mode,
                         args=['--remote-debugging-port=9222']
                     )
                     cdp_url = 'http://localhost:9222'
                 
                 self._page = await self._browser.new_page()
-                print(f"[PLAYWRIGHT] ✅ Browser created successfully - browser={self._browser is not None}, page={self._page is not None}")
+                
+                # Set global 4 second timeout for all operations
+                self._page.set_default_timeout(4000)
+                print(f"[PLAYWRIGHT] ✅ Browser created successfully with 4s timeout - browser={self._browser is not None}, page={self._page is not None}")
                 
                 # Notify frontend that browser is active
                 if self.logger:
@@ -355,21 +517,48 @@ class UniversalPlaywrightTool(BaseTool):
                 if self.logger:
                     self.logger.error(error_msg)
                 raise Exception(error_msg)
-        else:
-            print(f"[PLAYWRIGHT] ✅ Reusing existing browser for session: {self.session_id}")
-            print(f"[PLAYWRIGHT] Browser state - browser={self._browser is not None}, page={self._page is not None}")
+        # Browser already exists - no need to log every time
     
     async def _call_page_method(self, method: str, selector: Optional[str], args: Dict[str, Any], url: Optional[str] = None, timeout: Optional[int] = None) -> Any:
-        """Dynamically call a Playwright Page method."""
+        """Dynamically call a Playwright Page method or custom tool method."""
+        # Only log method name (removed redundant browser state logs)
         print(f"[PLAYWRIGHT] Calling method: {method}")
-        print(f"[PLAYWRIGHT] Browser state BEFORE call - browser={self._browser is not None}, page={self._page is not None}")
         
+        # Special handling for custom tool methods (not Page methods)
+        if method == "extract_chart":
+            # This is a custom method on the tool itself
+            required_fields = args.get("required_fields", [])
+            if not url and self._page:
+                url = self._page.url
+            
+            if not url:
+                raise ValueError("extract_chart requires a URL")
+            
+            # No need to log "Calling custom extract_chart method" - already logged method name above
+            return await self.extract_chart(url, required_fields)
+        
+        # Check if page is actually still valid
         if self._page is None:
             error = f"Page is None! Cannot call {method}"
             print(f"[PLAYWRIGHT] ERROR: {error}")
             if self.logger:
                 self.logger.error(f"❌ {error}")
             raise ValueError(error)
+        
+        # Check if page/browser closed - clear references and recreate
+        try:
+            if self._page.is_closed():
+                print(f"[PLAYWRIGHT] ⚠️ Page was closed, clearing references and recreating...")
+                # IMPORTANT: Clear references so _ensure_browser creates NEW instances
+                self._browser = None
+                self._page = None
+                await self._ensure_browser()
+        except Exception as e:
+            print(f"[PLAYWRIGHT] ⚠️ Browser/page check failed: {e}, clearing and recreating...")
+            # Clear all references to force fresh creation
+            self._browser = None
+            self._page = None
+            await self._ensure_browser()
         
         if not hasattr(self._page, method):
             raise ValueError(f"Method '{method}' not found on Playwright Page object")
@@ -415,6 +604,34 @@ class UniversalPlaywrightTool(BaseTool):
             
             # Send success log
             self._send_playwright_log(method, selector, args, url, status='success')
+            
+            # CHECK FOR URL CHANGES - Trigger Site Intelligence on navigation
+            if method in ['goto', 'click', 'press'] and self._page:
+                try:
+                    current_url = self._page.url
+                    
+                    # If URL changed and we don't have a hint, check if we should learn this page
+                    if current_url != self._last_url:
+                        print(f"[PLAYWRIGHT] 🔄 URL changed: {self._last_url} → {current_url}")
+                        self._last_url = current_url
+                        
+                        # Parse new URL
+                        parsed = urlparse(current_url)
+                        domain = parsed.netloc or parsed.path
+                        if domain.startswith('www.'):
+                            domain = domain[4:]
+                        
+                        # Check if we have intelligence for this page
+                        selector_map = get_selector_map()
+                        cache_file = selector_map.cache_dir / f"{domain}.json"
+                        
+                        # DISABLED: Site Intelligence after navigation
+                        # TODO: Re-enable after fixing "Extra data" JSON parsing
+                        if selector and not result:
+                            print(f"[PLAYWRIGHT] ⚠️ Selector failed on new page, but Site Intelligence disabled")
+                
+                except Exception as e:
+                    print(f"[PLAYWRIGHT] URL change detection error: {e}")
             
             # Handle different return types - pass context for better serialization
             return self._serialize_result(result, method, selector, args)
@@ -492,16 +709,57 @@ class UniversalPlaywrightTool(BaseTool):
         else:
             # Check if it's a Playwright Response object
             if hasattr(result, 'url') and hasattr(result, 'status'):
-                # Playwright Response object
+                # Playwright Response object - type guard
+                url_val = getattr(result, 'url', '')
+                status_val = getattr(result, 'status', 200)
+                ok_val = getattr(result, 'ok', True)
                 return {
                     "success": True,
-                    "url": result.url,
-                    "status": result.status if hasattr(result, 'status') else 200,
-                    "ok": result.ok if hasattr(result, 'ok') else True,
-                    "message": f"Successfully navigated to {result.url}"
+                    "url": url_val,
+                    "status": status_val,
+                    "ok": ok_val,
+                    "message": f"Successfully navigated to {url_val}"
                 }
             # For other complex objects, return string representation
             return str(result)
+    
+    async def extract_chart(
+        self,
+        url: str,
+        required_fields: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract structured chart/list data using scraping-first approach.
+        
+        Args:
+            url: URL to extract from
+            required_fields: Fields to extract (e.g., song, artist, producer)
+        
+        Returns:
+            List of records with required fields
+        """
+        from src.tools.chart_extractor import PlaywrightChartExtractor
+        
+        # Ensure browser is ready
+        await self._ensure_browser()
+        
+        # Type guard - ensure page exists
+        if self._page is None:
+            raise RuntimeError("Failed to initialize browser page")
+        
+        # Navigate to URL
+        await self._page.goto(url)
+        await self._page.wait_for_load_state("networkidle")
+        
+        # Extract using chart extractor
+        extractor = PlaywrightChartExtractor()
+        records = await extractor.extract_chart(
+            self._page,
+            url,
+            required_fields
+        )
+        
+        return records
     
     def as_langchain_tool(self):
         tool_instance = self

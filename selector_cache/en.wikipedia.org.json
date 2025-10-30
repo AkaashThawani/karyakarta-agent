@@ -1,0 +1,413 @@
+{
+  "site_intelligence": {
+    "url": "https://en.wikipedia.org/wiki/World_Tourism_rankings",
+    "learned_at": "2025-10-30T01:46:31.023880",
+    "total_elements_found": 150,
+    "classified_elements": 100,
+    "discovered_types": [
+      {
+        "type_name": "input_fields",
+        "description": "Input fields for user interaction",
+        "importance": "high",
+        "element_indices": [
+          17
+        ]
+      },
+      {
+        "type_name": "action_buttons",
+        "description": "Clickable buttons",
+        "importance": "high",
+        "element_indices": [
+          18,
+          46,
+          119
+        ]
+      },
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          2,
+          11,
+          25,
+          28,
+          31,
+          49,
+          52,
+          56,
+          60,
+          64
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "UL > LI",
+        "count": 494,
+        "sample": {
+          "text": "List of cities by international visitors",
+          "selector": "LI"
+        },
+        "selectors": {
+          "first": "LI:first-of-type",
+          "last": "LI:last-of-type",
+          "nth": "LI:nth-of-type({n})",
+          "all": "LI"
+        }
+      },
+      {
+        "pattern": "LI > A",
+        "count": 411,
+        "sample": {
+          "text": "List of cities by international visitors",
+          "selector": "A"
+        },
+        "selectors": {
+          "first": "A:first-of-type",
+          "last": "A:last-of-type",
+          "nth": "A:nth-of-type({n})",
+          "all": "A"
+        }
+      },
+      {
+        "pattern": "TR > TD",
+        "count": 130,
+        "sample": {
+          "text": "France",
+          "selector": "TD"
+        },
+        "selectors": {
+          "first": "TD:first-of-type",
+          "last": "TD:last-of-type",
+          "nth": "TD:nth-of-type({n})",
+          "all": "TD"
+        }
+      },
+      {
+        "pattern": "TBODY > TR",
+        "count": 69,
+        "sample": {
+          "text": "Destination\n\n2024[1]\nChange (2023 to 2024) (%)\n\n20",
+          "selector": "TR"
+        },
+        "selectors": {
+          "first": "TR:first-of-type",
+          "last": "TR:last-of-type",
+          "nth": "TR:nth-of-type({n})",
+          "all": "TR"
+        }
+      },
+      {
+        "pattern": "LI > A.mw-redirect",
+        "count": 58,
+        "sample": {
+          "text": "Enotourism",
+          "selector": "A.mw-redirect"
+        },
+        "selectors": {
+          "first": "A.mw-redirect:first-of-type",
+          "last": "A.mw-redirect:last-of-type",
+          "nth": "A.mw-redirect:nth-of-type({n})",
+          "all": "A.mw-redirect"
+        }
+      },
+      {
+        "pattern": "SPAN > IMG.mw-file-element",
+        "count": 51,
+        "sample": {
+          "text": "",
+          "selector": "IMG.mw-file-element"
+        },
+        "selectors": {
+          "first": "IMG.mw-file-element:first-of-type",
+          "last": "IMG.mw-file-element:last-of-type",
+          "nth": "IMG.mw-file-element:nth-of-type({n})",
+          "all": "IMG.mw-file-element"
+        }
+      },
+      {
+        "pattern": "A > SPAN",
+        "count": 40,
+        "sample": {
+          "text": "Main page",
+          "selector": "SPAN"
+        },
+        "selectors": {
+          "first": "SPAN:first-of-type",
+          "last": "SPAN:last-of-type",
+          "nth": "SPAN:nth-of-type({n})",
+          "all": "SPAN"
+        }
+      },
+      {
+        "pattern": "TD > SPAN.flagicon",
+        "count": 30,
+        "sample": {
+          "text": "",
+          "selector": "SPAN.flagicon"
+        },
+        "selectors": {
+          "first": "SPAN.flagicon:first-of-type",
+          "last": "SPAN.flagicon:last-of-type",
+          "nth": "SPAN.flagicon:nth-of-type({n})",
+          "all": "SPAN.flagicon"
+        }
+      },
+      {
+        "pattern": "SPAN.flagicon > SPAN.mw-image-border",
+        "count": 30,
+        "sample": {
+          "text": "",
+          "selector": "SPAN.mw-image-border"
+        },
+        "selectors": {
+          "first": "SPAN.mw-image-border:first-of-type",
+          "last": "SPAN.mw-image-border:last-of-type",
+          "nth": "SPAN.mw-image-border:nth-of-type({n})",
+          "all": "SPAN.mw-image-border"
+        }
+      },
+      {
+        "pattern": "SPAN.mw-image-border > SPAN",
+        "count": 30,
+        "sample": {
+          "text": "",
+          "selector": "SPAN"
+        },
+        "selectors": {
+          "first": "SPAN:first-of-type",
+          "last": "SPAN:last-of-type",
+          "nth": "SPAN:nth-of-type({n})",
+          "all": "SPAN"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html.client-js.vector-feature-language-in-header-enabled.vector-feature-language-in-main-page-header-disabled.vector-feature-page-tools-pinned-disabled.vector-feature-toc-pinned-clientpref-1.vector-feature-main-menu-pinned-disabled.vector-feature-limited-width-clientpref-1.vector-feature-limited-width-content-enabled.vector-feature-custom-font-size-clientpref-1.vector-feature-appearance-pinned-clientpref-1.vector-feature-night-mode-enabled.skin-theme-clientpref-day.vector-sticky-header-enabled.vector-toc-available",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html.client-js.vector-feature-language-in-header-enabled.vector-feature-language-in-main-page-header-disabled.vector-feature-page-tools-pinned-disabled.vector-feature-toc-pinned-clientpref-1.vector-feature-main-menu-pinned-disabled.vector-feature-limited-width-clientpref-1.vector-feature-limited-width-content-enabled.vector-feature-custom-font-size-clientpref-1.vector-feature-appearance-pinned-clientpref-1.vector-feature-night-mode-enabled.skin-theme-clientpref-day.vector-sticky-header-enabled.vector-toc-available > body.skin--responsive.skin-vector.skin-vector-search-vue.mediawiki.ltr.sitedir-ltr.mw-hide-empty-elt.ns-0.ns-subject.page-World_Tourism_rankings.rootpage-World_Tourism_rankings.skin-vector-2022.action-view",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "link_jump_to_content": {
+        "selector": "html.client-js.vector-feature-language-in-header-enabled.vector-feature-language-in-main-page-header-disabled.vector-feature-page-tools-pinned-disabled.vector-feature-toc-pinned-clientpref-1.vector-feature-main-menu-pinned-disabled.vector-feature-limited-width-clientpref-1.vector-feature-limited-width-content-enabled.vector-feature-custom-font-size-clientpref-1.vector-feature-appearance-pinned-clientpref-1.vector-feature-night-mode-enabled.skin-theme-clientpref-day.vector-sticky-header-enabled.vector-toc-available > body.skin--responsive.skin-vector.skin-vector-search-vue.mediawiki.ltr.sitedir-ltr.mw-hide-empty-elt.ns-0.ns-subject.page-World_Tourism_rankings.rootpage-World_Tourism_rankings.skin-vector-2022.action-view > a.mw-jump-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "div_element": {
+        "selector": "#p-views",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "header_element": {
+        "selector": "div.mw-page-container > div.mw-page-container-inner > div.mw-content-container > main.mw-body > header.mw-body-header.vector-page-titlebar.no-font-mode-scale",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: header tag"
+      },
+      "nav_element": {
+        "selector": "main.mw-body > div.vector-page-toolbar.vector-feature-custom-font-size-clientpref--excluded > div.vector-page-toolbar-container > div.vector-collapsible > nav",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: nav tag"
+      },
+      "text_input_field": {
+        "selector": "#p-lang-btn-checkbox",
+        "purpose": "Text input field",
+        "category": "form",
+        "confidence": 0.7,
+        "reasoning": "Heuristic: input tag"
+      },
+      "label_element": {
+        "selector": "#p-lang-btn-label",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: label tag"
+      },
+      "span_element": {
+        "selector": "div.vector-menu-content > ul.vector-menu-content-list > li.vector-tab-noicon.mw-list-item > a > span",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "link_nav": {
+        "selector": "body.skin--responsive.skin-vector.skin-vector-search-vue.mediawiki.ltr.sitedir-ltr.mw-hide-empty-elt.ns-0.ns-subject.page-World_Tourism_rankings.rootpage-World_Tourism_rankings.skin-vector-2022.action-view > div.vector-header-container > header.vector-header.mw-header.no-font-mode-scale > div.vector-header-start > a.mw-logo",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "form_element": {
+        "selector": "#searchform",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: form tag"
+      },
+      "search_input_search": {
+        "selector": "#searchInput",
+        "purpose": "Search input field",
+        "category": "search",
+        "confidence": 0.8,
+        "reasoning": "Input with type=search, search-related attributes"
+      },
+      "search_button": {
+        "selector": "div.vector-search-box-vue.vector-search-box-collapses.vector-search-box-show-thumbnail.vector-search-box-auto-expand-width.vector-search-box > div.vector-typeahead-search-container > div.cdx-typeahead-search.cdx-typeahead-search--show-thumbnail.cdx-typeahead-search--auto-expand-width > form.cdx-search-input.cdx-search-input--has-end-button > button.cdx-button.cdx-search-input__end-button",
+        "purpose": "Search submit button",
+        "category": "search",
+        "confidence": 0.8,
+        "reasoning": "Heuristic: button tag"
+      },
+      "ul_element": {
+        "selector": "#mw-panel-toc-list",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: ul tag"
+      },
+      "li_element": {
+        "selector": "#ca-view",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: li tag"
+      },
+      "link_donate": {
+        "selector": "div.vector-menu.mw-portlet > div.vector-menu-content > ul.vector-menu-content-list > li.user-links-collapsible-item.mw-list-item.user-links-collapsible-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_create_account": {
+        "selector": "div.vector-menu.mw-portlet > div.vector-menu-content > ul.vector-menu-content-list > li.user-links-collapsible-item.mw-list-item.user-links-collapsible-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_log_in": {
+        "selector": "div.vector-menu.mw-portlet > div.vector-menu-content > ul.vector-menu-content-list > li.user-links-collapsible-item.mw-list-item.user-links-collapsible-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "h2_element": {
+        "selector": "nav.mw-table-of-contents-container.vector-toc-landmark > div.vector-pinned-container > div.vector-toc.vector-pinnable-element > div.vector-pinnable-header.vector-toc-pinnable-header.vector-pinnable-header-pinned > h2.vector-pinnable-header-label",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h2 tag"
+      },
+      "button_hide": {
+        "selector": "nav.mw-table-of-contents-container.vector-toc-landmark > div.vector-pinned-container > div.vector-toc.vector-pinnable-element > div.vector-pinnable-header.vector-toc-pinnable-header.vector-pinnable-header-pinned > button.vector-pinnable-header-toggle-button.vector-pinnable-header-unpin-button",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "link_(top)": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1 > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_1\n\t\t\t\tmost_visited_destination": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_2\n\t\t\t\tinternational_tourism_re": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_3\n\t\t\t\tinternational_tourism_ex": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_4\n\t\t\t\tsee_also": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_5\n\t\t\t\treferences": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_6\n\t\t\t\texternal_links": {
+        "selector": "div.vector-pinned-container > div.vector-toc.vector-pinnable-element > ul.vector-toc-contents > li.vector-toc-list-item.vector-toc-level-1.vector-toc-list-item-expanded > a.vector-toc-link",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "main_element": {
+        "selector": "#content",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: main tag"
+      },
+      "h1_element": {
+        "selector": "#firstHeading",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h1 tag"
+      },
+      "link_article": {
+        "selector": "div.vector-menu.vector-menu-tabs.mw-portlet.mw-portlet-associated-pages > div.vector-menu-content > ul.vector-menu-content-list > li.selected.vector-tab-noicon.mw-list-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_talk": {
+        "selector": "div.vector-menu.vector-menu-tabs.mw-portlet.mw-portlet-associated-pages > div.vector-menu-content > ul.vector-menu-content-list > li.vector-tab-noicon.mw-list-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_read": {
+        "selector": "div.vector-menu.vector-menu-tabs.mw-portlet.mw-portlet-views > div.vector-menu-content > ul.vector-menu-content-list > li.selected.vector-tab-noicon.mw-list-item > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

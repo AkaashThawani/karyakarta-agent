@@ -1,0 +1,18 @@
+{
+  "site_intelligence": {
+    "url": "https://music.youtube.com/",
+    "learned_at": "2025-10-29T20:02:17.026118",
+    "total_elements_found": 1,
+    "classified_elements": 1,
+    "discovered_types": [],
+    "elements": {
+      "chrome_download_cta_link": {
+        "selector": "html > body > div.content > div.cta-wrapper > a.cta",
+        "purpose": "To prompt users to download or learn more about Google Chrome by navigating to its dedicated product page.",
+        "category": "call_to_action",
+        "confidence": 1.0,
+        "reasoning": "The element is an anchor tag (`<a>`) with the text 'Get Chrome', a 'cta' class (Call To Action), and an `href` attribute pointing directly to the Google Chrome download/information page. This combination clearly indicates its purpose as a primary action link for Chrome."
+      }
+    }
+  }
+}

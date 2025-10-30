@@ -161,7 +161,7 @@ railway init
 railway variables set SUPABASE_URL="https://xxx.supabase.co"
 railway variables set SUPABASE_ANON_KEY="eyJ..."
 railway variables set SUPABASE_SERVICE_KEY="eyJ..."
-railway variables set GOOGLE_API_KEY="your_key"
+railway variables set GEMINI_API_KEY="your_key"
 railway variables set PORT="8000"
 
 # Deploy
@@ -196,7 +196,7 @@ git push origin main
    SUPABASE_URL=https://xxx.supabase.co
    SUPABASE_ANON_KEY=eyJ...
    SUPABASE_SERVICE_KEY=eyJ...
-   GOOGLE_API_KEY=your_key
+   GEMINI_API_KEY=your_key
    PORT=8000
    LOGGING_URL=https://app.yourdomain.com/api/socket/log
    ```
@@ -298,7 +298,7 @@ SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # LLM
-GOOGLE_API_KEY=AIzaSyD...
+GEMINI_API_KEY=AIzaSyD...
 
 # Server
 PORT=8000

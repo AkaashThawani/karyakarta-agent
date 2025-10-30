@@ -1,0 +1,24 @@
+{
+  "site_intelligence": {
+    "url": "https://www.goodreads.com/",
+    "learned_at": "2025-10-29T19:35:20.743390",
+    "total_elements_found": 0,
+    "classified_elements": 0,
+    "discovered_types": [],
+    "elements": {}
+  },
+  "playwright_execute": {
+    "search_input": {
+      "best": "#sitesearch_field",
+      "selectors": {
+        "#sitesearch_field": {
+          "success": 4,
+          "fail": 0,
+          "last_used": 1761798316.069973,
+          "avg_response_time": 1.2118092775344849
+        }
+      },
+      "fallbacks": []
+    }
+  }
+}

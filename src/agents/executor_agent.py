@@ -122,13 +122,20 @@ class ExecutorAgent(BaseAgent):
             self.state.update_status(AgentStatus.COMPLETED)
             
             if tool_result.success:
+                # FIX 5: Evaluate task completeness
+                completeness = self._evaluate_completeness(task, tool_result, context)
+                
                 return AgentResult.success_result(
                     data=tool_result.data,
                     agent_id=self.agent_id,
                     execution_time=execution_time,
                     metadata={
                         "tool": tool.name,
-                        "tool_metadata": tool_result.metadata
+                        "tool_metadata": tool_result.metadata,
+                        "complete": completeness["complete"],
+                        "completeness_reason": completeness.get("reason"),
+                        "suggested_action": completeness.get("next_action"),
+                        "coverage": completeness.get("coverage", "100%")
                     }
                 )
             else:
@@ -190,6 +197,7 @@ class ExecutorAgent(BaseAgent):
     ) -> ToolResult:
         """
         Execute tool with retry logic.
+        Handles both synchronous and asynchronous tools.
         
         Args:
             tool: Tool to execute
@@ -198,14 +206,32 @@ class ExecutorAgent(BaseAgent):
         Returns:
             ToolResult from tool execution
         """
+        import asyncio
+        import inspect
+        
         last_error = None
         
         for attempt in range(self.max_retries):
             try:
                 self.log(f"Attempt {attempt + 1}/{self.max_retries} for {tool.name}")
                 
-                # Execute tool
+                # Check if tool.execute returns a coroutine (async)
                 result = tool.execute(**parameters)
+                
+                # If result is a coroutine, await it
+                if inspect.iscoroutine(result):
+                    print(f"[EXECUTOR] Tool {tool.name} is async, awaiting...")
+                    try:
+                        # Try to use existing event loop
+                        loop = asyncio.get_running_loop()
+                        # Loop is running, we're in async context - shouldn't happen
+                        # but if it does, schedule the coroutine
+                        future = asyncio.run_coroutine_threadsafe(result, loop)
+                        result = future.result()
+                    except RuntimeError:
+                        # No running loop, create one with asyncio.run
+                        result = asyncio.run(result)
+                    print(f"[EXECUTOR] Async tool completed")
                 
                 if result.success:
                     if attempt > 0:
@@ -278,6 +304,97 @@ class ExecutorAgent(BaseAgent):
             List of tool names
         """
         return list(self.tools.keys())
+    
+    def _evaluate_completeness(
+        self,
+        task: AgentTask,
+        tool_result: ToolResult,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Evaluate if the task was completed fully or needs more work.
+        
+        Args:
+            task: Original task
+            tool_result: Tool execution result
+            context: Execution context
+            
+        Returns:
+            Dict with completeness info: {
+                "complete": bool,
+                "reason": str (if incomplete),
+                "next_action": str (if incomplete),
+                "coverage": str (e.g., "70%")
+            }
+        """
+        completeness = {
+            "complete": True,
+            "coverage": "100%"
+        }
+        
+        try:
+            # Check if task had specific requirements
+            task_desc = task.description.lower()
+            result_data = str(tool_result.data).lower()
+            
+            # Check for quantity requirements (e.g., "top 10", "5 items")
+            import re
+            quantity_match = re.search(r'(top|find|get|list)\s+(\d+)', task_desc)
+            if quantity_match:
+                requested_count = int(quantity_match.group(2))
+                
+                # Try to count items in result
+                # Simple heuristic: count lines, list items, or numbered entries
+                result_lines = tool_result.data.split('\n') if isinstance(tool_result.data, str) else []
+                numbered_items = len(re.findall(r'^\d+[\.\)]\s+', tool_result.data, re.MULTILINE)) if isinstance(tool_result.data, str) else 0
+                list_items = len(re.findall(r'^[-\*]\s+', tool_result.data, re.MULTILINE)) if isinstance(tool_result.data, str) else 0
+                
+                found_count = max(numbered_items, list_items, len([l for l in result_lines if l.strip()]))
+                
+                if found_count < requested_count:
+                    coverage = int((found_count / requested_count) * 100)
+                    completeness = {
+                        "complete": False,
+                        "reason": f"Found {found_count}/{requested_count} items",
+                        "next_action": "search_more_sources",
+                        "coverage": f"{coverage}%"
+                    }
+                    self.log(f"Task incomplete: {completeness['reason']}")
+            
+            # Check for specific fields requested (e.g., "with price and specs")
+            required_fields = []
+            if 'price' in task_desc and 'price' not in result_data and '$' not in result_data:
+                required_fields.append('price')
+            if 'spec' in task_desc and 'spec' not in result_data:
+                required_fields.append('specifications')
+            if 'rating' in task_desc and 'rating' not in result_data and '⭐' not in result_data:
+                required_fields.append('rating')
+            
+            if required_fields:
+                completeness = {
+                    "complete": False,
+                    "reason": f"Missing required fields: {', '.join(required_fields)}",
+                    "next_action": "extract_more_details",
+                    "coverage": "75%"
+                }
+                self.log(f"Task incomplete: {completeness['reason']}")
+            
+            # Check result size - if very short, might be incomplete
+            if isinstance(tool_result.data, str) and len(tool_result.data.strip()) < 50:
+                if 'find' in task_desc or 'search' in task_desc:
+                    completeness = {
+                        "complete": False,
+                        "reason": "Result too brief for search query",
+                        "next_action": "search_alternate_sources",
+                        "coverage": "50%"
+                    }
+                    self.log(f"Task incomplete: {completeness['reason']}")
+            
+        except Exception as e:
+            # If evaluation fails, assume complete to avoid blocking
+            self.log(f"Completeness evaluation failed: {e}", level="warning")
+        
+        return completeness
     
     def get_tool(self, tool_name: str) -> Optional[BaseTool]:
         """

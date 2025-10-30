@@ -1,0 +1,339 @@
+{
+  "site_intelligence": {
+    "url": "https://worldpopulationreview.com/country-rankings/most-visited-countries",
+    "learned_at": "2025-10-30T01:46:32.263470",
+    "total_elements_found": 150,
+    "classified_elements": 100,
+    "discovered_types": [
+      {
+        "type_name": "input_fields",
+        "description": "Input fields for user interaction",
+        "importance": "high",
+        "element_indices": [
+          18,
+          112
+        ]
+      },
+      {
+        "type_name": "action_buttons",
+        "description": "Clickable buttons",
+        "importance": "high",
+        "element_indices": [
+          11,
+          15,
+          19,
+          110,
+          113
+        ]
+      },
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          6,
+          25,
+          27,
+          69,
+          71,
+          77,
+          79,
+          85,
+          87,
+          93
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "TR.table-row > TD.border-wpr-table_border",
+        "count": 420,
+        "sample": {
+          "text": "",
+          "selector": "TD.border-wpr-table_border"
+        },
+        "selectors": {
+          "first": "TD.border-wpr-table_border:first-of-type",
+          "last": "TD.border-wpr-table_border:last-of-type",
+          "nth": "TD.border-wpr-table_border:nth-of-type({n})",
+          "all": "TD.border-wpr-table_border"
+        }
+      },
+      {
+        "pattern": "TBODY > TR.table-row",
+        "count": 140,
+        "sample": {
+          "text": "Kiribati2K",
+          "selector": "TR.table-row"
+        },
+        "selectors": {
+          "first": "TR.table-row:first-of-type",
+          "last": "TR.table-row:last-of-type",
+          "nth": "TR.table-row:nth-of-type({n})",
+          "all": "TR.table-row"
+        }
+      },
+      {
+        "pattern": "TD.border-wpr-table_border > DIV.flex",
+        "count": 140,
+        "sample": {
+          "text": "",
+          "selector": "DIV.flex"
+        },
+        "selectors": {
+          "first": "DIV.flex:first-of-type",
+          "last": "DIV.flex:last-of-type",
+          "nth": "DIV.flex:nth-of-type({n})",
+          "all": "DIV.flex"
+        }
+      },
+      {
+        "pattern": "TD.border-wpr-table_border > SPAN",
+        "count": 140,
+        "sample": {
+          "text": "Kiribati",
+          "selector": "SPAN"
+        },
+        "selectors": {
+          "first": "SPAN:first-of-type",
+          "last": "SPAN:last-of-type",
+          "nth": "SPAN:nth-of-type({n})",
+          "all": "SPAN"
+        }
+      },
+      {
+        "pattern": "DIV.flex > SPAN",
+        "count": 139,
+        "sample": {
+          "text": "",
+          "selector": "SPAN"
+        },
+        "selectors": {
+          "first": "SPAN:first-of-type",
+          "last": "SPAN:last-of-type",
+          "nth": "SPAN:nth-of-type({n})",
+          "all": "SPAN"
+        }
+      },
+      {
+        "pattern": "SPAN > IMG.min-w-7",
+        "count": 139,
+        "sample": {
+          "text": "",
+          "selector": "IMG.min-w-7"
+        },
+        "selectors": {
+          "first": "IMG.min-w-7:first-of-type",
+          "last": "IMG.min-w-7:last-of-type",
+          "nth": "IMG.min-w-7:nth-of-type({n})",
+          "all": "IMG.min-w-7"
+        }
+      },
+      {
+        "pattern": "SPAN > A",
+        "count": 139,
+        "sample": {
+          "text": "Kiribati",
+          "selector": "A"
+        },
+        "selectors": {
+          "first": "A:first-of-type",
+          "last": "A:last-of-type",
+          "nth": "A:nth-of-type({n})",
+          "all": "A"
+        }
+      },
+      {
+        "pattern": "ASTRO-ISLAND > LINK",
+        "count": 26,
+        "sample": {
+          "text": "",
+          "selector": "LINK"
+        },
+        "selectors": {
+          "first": "LINK:first-of-type",
+          "last": "LINK:last-of-type",
+          "nth": "LINK:nth-of-type({n})",
+          "all": "LINK"
+        }
+      },
+      {
+        "pattern": "DIV.flex > SPAN.mr-2",
+        "count": 25,
+        "sample": {
+          "text": "",
+          "selector": "SPAN.mr-2"
+        },
+        "selectors": {
+          "first": "SPAN.mr-2:first-of-type",
+          "last": "SPAN.mr-2:last-of-type",
+          "nth": "SPAN.mr-2:nth-of-type({n})",
+          "all": "SPAN.mr-2"
+        }
+      },
+      {
+        "pattern": "g > path",
+        "count": 22,
+        "sample": {
+          "text": "",
+          "selector": "path"
+        },
+        "selectors": {
+          "first": "path:first-of-type",
+          "last": "path:last-of-type",
+          "nth": "path:nth-of-type({n})",
+          "all": "path"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html > body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "div_element": {
+        "selector": "div.flex.flex-col > div.container.py-4 > div.grid.grid-cols-2.gap-4.md:grid-cols-3.lg:grid-cols-5 > div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "nav_element": {
+        "selector": "div.relative.lg:container.lg:mx-auto > div.pb-3.md:pb-4.lg:pb-5 > div.flex.flex-col.lg:flex-row > div.order-1.bg-white.p-1.md:p-3.lg:w-full.lg:p-4 > nav.m-1.text-sm",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: nav tag"
+      },
+      "link_world_population_review": {
+        "selector": "div.bg-wpr-nav_bkgd.transition-top.not-prose.fixed.top-0.z-50.block.w-full.shadow-xs.shadow-gray-400.delay-100.duration-300.ease-in-out > div.relative.xl:container.xl:mx-auto > nav.navbar.bg-wpr-nav_bkgd.z-60.px-2.lg:flex.lg:items-stretch > div.navbar-brand.flex.min-h-[3.25rem].shrink-0.items-center.justify-between > a.navbar-item.hover:text-wpr-link_hover.relative.flex.shrink-0.grow-0.items-center.gap-x-2.p-2.text-base.leading-normal.text-white.transition-colors.duration-200.ease-in-out.hover:bg-transparent!.md:gap-x-1.md:text-sm.xl:gap-x-2.xl:text-base",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "span_element": {
+        "selector": "div.grid.grid-cols-2.gap-4.md:grid-cols-3.lg:grid-cols-5 > div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > p.m-0.mt-1.text-xl.font-bold.text-gray-900 > span",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: span tag"
+      },
+      "button_data_by_location__chevron": {
+        "selector": "nav.navbar.bg-wpr-nav_bkgd.z-60.px-2.lg:flex.lg:items-stretch > div.overscroll-none.lg:flex.lg:shrink-0.lg:grow.lg:flex-row.lg:items-stretch > div.navigation-menu.hidden.flex-col.pb-2.lg:order-first.lg:mx-auto.lg:flex.lg:flex-row.lg:items-stretch.lg:justify-center.lg:pb-0 > div.md:relative.lg:py-2 > button.group.dropdown-toggle.navbar-link.hover:bg-wpr-nav_bkgd_active.flex.items-center.gap-1.5.rounded-lg.p-3.text-base.leading-normal.text-white.hover:cursor-pointer.lg:p-2.lg:text-sm.xl:p-3.xl:text-base",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "svg_element": {
+        "selector": "div.overscroll-none.lg:flex.lg:shrink-0.lg:grow.lg:flex-row.lg:items-stretch > div.navigation-menu.hidden.flex-col.pb-2.lg:order-first.lg:mx-auto.lg:flex.lg:flex-row.lg:items-stretch.lg:justify-center.lg:pb-0 > div.lg:py-2 > button.group.dropdown-toggle.navbar-link.is-current-base.hover:bg-wpr-nav_bkgd_active.flex.items-center.gap-1.5.rounded-lg.p-3.text-base.leading-normal.text-white.hover:cursor-pointer.lg:p-2.lg:text-sm.xl:p-3.xl:text-base > svg.menu-chevron.pointer-events-none.h-3.w-3.group-[.nav-active]:rotate-180",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: svg tag"
+      },
+      "button_ranking_&_comparison__chevron": {
+        "selector": "nav.navbar.bg-wpr-nav_bkgd.z-60.px-2.lg:flex.lg:items-stretch > div.overscroll-none.lg:flex.lg:shrink-0.lg:grow.lg:flex-row.lg:items-stretch > div.navigation-menu.hidden.flex-col.pb-2.lg:order-first.lg:mx-auto.lg:flex.lg:flex-row.lg:items-stretch.lg:justify-center.lg:pb-0 > div.lg:py-2 > button.group.dropdown-toggle.navbar-link.is-current-base.hover:bg-wpr-nav_bkgd_active.flex.items-center.gap-1.5.rounded-lg.p-3.text-base.leading-normal.text-white.hover:cursor-pointer.lg:p-2.lg:text-sm.xl:p-3.xl:text-base",
+        "purpose": "Action button",
+        "category": "action",
+        "confidence": 0.6,
+        "reasoning": "Heuristic: button tag"
+      },
+      "search_input_query": {
+        "selector": "div.navbar-end.md:ml-1.lg:order-last.lg:flex.lg:items-stretch.lg:justify-end.xl:ml-4 > div.navbar-item.relative.hidden.shrink-0.grow-0.py-2.pl-3.leading-normal.lg:flex.lg:items-center > form.m-0 > div.control.bg-navBg.relative.clear-both.box-border.flex.flex-row-reverse.flex-nowrap.gap-x-1.rounded-lg.border.border-gray-500.text-sm.hover:border-gray-400 > input.wpr-input-base.nav-input",
+        "purpose": "Search input field",
+        "category": "search",
+        "confidence": 0.8,
+        "reasoning": "Input with type=search, search-related attributes"
+      },
+      "submit_button": {
+        "selector": "div.navbar-end.md:ml-1.lg:order-last.lg:flex.lg:items-stretch.lg:justify-end.xl:ml-4 > div.navbar-item.relative.hidden.shrink-0.grow-0.py-2.pl-3.leading-normal.lg:flex.lg:items-center > form.m-0 > div.control.bg-navBg.relative.clear-both.box-border.flex.flex-row-reverse.flex-nowrap.gap-x-1.rounded-lg.border.border-gray-500.text-sm.hover:border-gray-400 > button.px-2.pr-1",
+        "purpose": "Form submit button",
+        "category": "action",
+        "confidence": 0.75,
+        "reasoning": "Heuristic: button tag"
+      },
+      "link_culture": {
+        "selector": "div.pb-3.md:pb-4.lg:pb-5 > div.flex.flex-col.lg:flex-row > div.order-1.bg-white.p-1.md:p-3.lg:w-full.lg:p-4 > nav.m-1.text-sm > a.text-gray-600.hover:text-gray-800",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_travel": {
+        "selector": "div.pb-3.md:pb-4.lg:pb-5 > div.flex.flex-col.lg:flex-row > div.order-1.bg-white.p-1.md:p-3.lg:w-full.lg:p-4 > nav.m-1.text-sm > a.text-gray-600.hover:text-gray-800",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "h1_element": {
+        "selector": "#title",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h1 tag"
+      },
+      "p_element": {
+        "selector": "div.container.py-4 > div.grid.grid-cols-2.gap-4.md:grid-cols-3.lg:grid-cols-5 > div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > p.m-0.mt-1.text-xl.font-bold.text-gray-900",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "h2_element": {
+        "selector": "div.grid.grid-cols-2.gap-4.md:grid-cols-3.lg:grid-cols-5 > div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > h2.m-0.truncate.text-sm.font-semibold.text-gray-800",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h2 tag"
+      },
+      "link_nav": {
+        "selector": "div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > span.mr-2.text-2xl > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_kiribati": {
+        "selector": "div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > h2.m-0.truncate.text-sm.font-semibold.text-gray-800 > a.hover:text-wpr-link_hover.text-gray-900",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_bhutan": {
+        "selector": "div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > h2.m-0.truncate.text-sm.font-semibold.text-gray-800 > a.hover:text-wpr-link_hover.text-gray-900",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_tonga": {
+        "selector": "div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > h2.m-0.truncate.text-sm.font-semibold.text-gray-800 > a.hover:text-wpr-link_hover.text-gray-900",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      },
+      "link_samoa": {
+        "selector": "div.overflow-hidden.rounded-lg.border.border-gray-200.bg-white.hover:bg-gray-100 > div.p-4 > div.flex.items-center > h2.m-0.truncate.text-sm.font-semibold.text-gray-800 > a.hover:text-wpr-link_hover.text-gray-900",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

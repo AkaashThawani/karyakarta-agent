@@ -1,0 +1,99 @@
+{
+  "site_intelligence": {
+    "url": "https://www.passportindex.org/byRank.php",
+    "learned_at": "2025-10-30T01:43:46.026956",
+    "total_elements_found": 15,
+    "classified_elements": 15,
+    "discovered_types": [
+      {
+        "type_name": "navigation_links",
+        "description": "Navigation and content links",
+        "importance": "medium",
+        "element_indices": [
+          14
+        ]
+      }
+    ],
+    "list_structures": [
+      {
+        "pattern": "HEAD > META",
+        "count": 5,
+        "sample": {
+          "text": "",
+          "selector": "META"
+        },
+        "selectors": {
+          "first": "META:first-of-type",
+          "last": "META:last-of-type",
+          "nth": "META:nth-of-type({n})",
+          "all": "META"
+        }
+      },
+      {
+        "pattern": "DIV.lds-ring > DIV",
+        "count": 4,
+        "sample": {
+          "text": "",
+          "selector": "DIV"
+        },
+        "selectors": {
+          "first": "DIV:first-of-type",
+          "last": "DIV:last-of-type",
+          "nth": "DIV:nth-of-type({n})",
+          "all": "DIV"
+        }
+      }
+    ],
+    "elements": {
+      "html_element": {
+        "selector": "html",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: html tag"
+      },
+      "body_element": {
+        "selector": "html > body",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: body tag"
+      },
+      "div_element": {
+        "selector": "#footer-text",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: div tag"
+      },
+      "h1_element": {
+        "selector": "html > body > div.main-wrapper > div.main-content > h1.zone-name-title.h1",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: h1 tag"
+      },
+      "p_element": {
+        "selector": "#GFpwk5",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: p tag"
+      },
+      "code_element": {
+        "selector": "div.footer > div.footer-inner > div.clearfix.diagnostic-wrapper > div.ray-id > code",
+        "purpose": "Interactive element",
+        "category": "unknown",
+        "confidence": 0.5,
+        "reasoning": "Heuristic: code tag"
+      },
+      "link_cloudflare": {
+        "selector": "body > div.footer > div.footer-inner > div.text-center > a",
+        "purpose": "Navigation link",
+        "category": "navigation",
+        "confidence": 0.7,
+        "reasoning": "Anchor tag for navigation"
+      }
+    }
+  }
+}

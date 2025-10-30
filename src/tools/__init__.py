@@ -6,7 +6,7 @@ This package contains all tool implementations for the agent.
 
 # Import base tools
 from .base import BaseTool
-from .search import SearchTool
+# from .search import SearchTool  # TEMP DISABLED - Agent should use browser to search Google
 from .scraper import ScraperTool
 from .calculator import CalculatorTool
 from .extractor import ExtractorTool
@@ -44,10 +44,23 @@ from .analysis_tools import (
     ValidateDataTool
 )
 
+# Import Playwright universal tool
+from .playwright_universal import UniversalPlaywrightTool
+
+# Import helper classes (not tools, but used by tools)
+from .chart_extractor import PlaywrightChartExtractor
+from .chart_extractor_tool import ChartExtractorTool
+from .element_parser import ElementParser
+from .site_intelligence import SiteIntelligenceTool
+
+# Import learning and fallback managers
+from .learning_manager import LearningManager, get_learning_manager
+from .fallback_manager import ToolFallbackChain, get_fallback_manager
+
 __all__ = [
     # Base tools
     'BaseTool',
-    'SearchTool',
+    # 'SearchTool',  # TEMP DISABLED - Agent should use browser to search Google
     'ScraperTool',
     'CalculatorTool',
     'ExtractorTool',
@@ -76,4 +89,19 @@ __all__ = [
     'SummarizeContentTool',
     'CompareDataTool',
     'ValidateDataTool',
+    
+    # Playwright tools
+    'UniversalPlaywrightTool',
+    'ChartExtractorTool',
+    
+    # Helper classes (used by tools)
+    'PlaywrightChartExtractor',
+    'ElementParser',
+    'SiteIntelligenceTool',
+    
+    # Learning and fallback managers
+    'LearningManager',
+    'get_learning_manager',
+    'ToolFallbackChain',
+    'get_fallback_manager',
 ]

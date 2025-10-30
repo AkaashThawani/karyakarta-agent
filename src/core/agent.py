@@ -533,6 +533,50 @@ class MultiAgentManager(AgentManager):
         try:
             self.logger.thinking("Analyzing your request with multi-agent system...", message_id)
             
+            # FIX 1: Load conversation history from database
+            conversation_history = []
+            previous_results = []
+            
+            try:
+                session_service = get_session_service()
+                messages = session_service.get_session_messages(session_id)
+                
+                # Format messages as conversation history (last 10 messages)
+                recent_messages = messages[-10:] if len(messages) > 10 else messages
+                
+                for msg in recent_messages:
+                    # Handle both dict and object formats
+                    role = msg.get('role') if isinstance(msg, dict) else msg.role
+                    content = msg.get('content') if isinstance(msg, dict) else msg.content
+                    created_at = msg.get('created_at') if isinstance(msg, dict) else msg.created_at
+                    
+                    conversation_history.append({
+                        "role": role,
+                        "content": content,
+                        "timestamp": created_at.isoformat() if hasattr(created_at, 'isoformat') else str(created_at)
+                    })
+                    
+                    # Extract previous results from agent messages
+                    # Store the PREVIOUS user query as "task" for follow-up detection
+                    if role == "agent" and conversation_history:
+                        # Get the user message that prompted this agent response
+                        user_query = ""
+                        for prev_msg in reversed(conversation_history):
+                            if prev_msg["role"] == "user":
+                                user_query = prev_msg["content"]
+                                break
+                        
+                        previous_results.append({
+                            "task": user_query,  # The query that led to this result
+                            "result": {"answer": content},  # The agent's response
+                            "timestamp": created_at.isoformat() if hasattr(created_at, 'isoformat') else str(created_at)
+                        })
+                
+                print(f"[MultiAgentManager] Loaded {len(conversation_history)} messages from history")
+            except Exception as e:
+                print(f"[MultiAgentManager] Failed to load conversation history: {e}")
+                # Continue without history
+            
             # Create task
             task = AgentTask(
                 task_type="user_query",
@@ -541,10 +585,19 @@ class MultiAgentManager(AgentManager):
                 priority=TaskPriority.MEDIUM
             )
             
+            # FIX 2: Create context with conversation history
+            execution_context = {
+                "conversation_history": conversation_history,
+                "session_id": session_id,
+                "previous_results": previous_results,
+                "original_request": prompt
+            }
+            
             if use_reason_agent:
                 # Use reason agent for complex tasks
                 self.logger.status("Planning execution strategy...", message_id)
-                result = self.reason_agent.execute(task)
+                # Pass context to ReasonAgent
+                result = self.reason_agent.execute(task, context=execution_context)
             else:
                 # Direct execution with executor
                 self.logger.status("Executing task directly...", message_id)
