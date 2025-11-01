@@ -216,28 +216,359 @@ class ReasonAgent(BaseAgent):
     
     def _analyze_task(self, task: AgentTask) -> Dict[str, Any]:
         """
-        Analyze task to understand requirements.
+        Analyze task comprehensively in a SINGLE LLM call.
+        Replaces 4 separate LLM calls with 1 combined analysis.
         
         Args:
             task: Task to analyze
             
         Returns:
-            Analysis results
+            Analysis results with all required information
         """
-        # Simple analysis - in full implementation, use LLM
-        required_tools = self._identify_required_tools(task)
+        # Use comprehensive analysis (1 LLM call instead of 4)
+        comprehensive = self._analyze_task_comprehensive(task)
         
-        analysis = {
-            "task_type": task.task_type,
-            "complexity": "simple" if len(task.parameters) <= 2 else "complex",
-            "required_tools": required_tools,
-            "estimated_steps": len(required_tools)
-        }
+        if comprehensive:
+            # Got analysis from LLM
+            analysis = {
+                "task_type": task.task_type,
+                "detected_type": comprehensive.get("task_type", "general"),
+                "complexity": "simple" if len(comprehensive.get("required_tools", [])) <= 2 else "complex",
+                "required_tools": comprehensive.get("required_tools", []),
+                "estimated_steps": len(comprehensive.get("required_tools", [])),
+                "query_params": comprehensive.get("query_params", {}),
+                "required_fields": comprehensive.get("required_fields", []),
+                "task_structure": comprehensive.get("task_structure", {"type": "single"})
+            }
+        else:
+            # Fallback to simple analysis if LLM fails
+            required_tools = self._identify_required_tools(task)
+            analysis = {
+                "task_type": task.task_type,
+                "detected_type": "general",
+                "complexity": "simple" if len(task.parameters) <= 2 else "complex",
+                "required_tools": required_tools,
+                "estimated_steps": len(required_tools),
+                "query_params": {},
+                "required_fields": [],
+                "task_structure": {"type": "single"}
+            }
         
-        # Removed verbose logging - keeping only essential info
-        self.log(f"Task analysis complete: {len(required_tools)} tools identified")
+        self.log(f"Task analysis complete: {len(analysis['required_tools'])} tools identified")
         
         return analysis
+    
+    def _analyze_task_comprehensive(self, task: AgentTask) -> Optional[Dict[str, Any]]:
+        """
+        SINGLE comprehensive LLM call for complete task analysis.
+        Replaces 4 separate calls: query params, task type, tool selection, field extraction.
+        
+        Args:
+            task: Task to analyze
+            
+        Returns:
+            Complete analysis dict or None if LLM fails
+        """
+        if not self.llm_service:
+            return None
+        
+        # Get tool descriptions for context
+        tool_descriptions = self._get_tool_descriptions()
+        if not tool_descriptions:
+            return None
+        
+        # Build comprehensive analysis prompt
+        prompt = f"""Analyze this task comprehensively and return ALL information in one JSON response.
+
+Task: "{task.description}"
+
+Available Tools:
+"""
+        # Only include most relevant tools to reduce prompt size
+        relevant_tools = ["google_search", "playwright_execute", "api_call", "chart_extractor"]
+        for tool_name in relevant_tools:
+            if tool_name in tool_descriptions:
+                prompt += f"- {tool_name}: {tool_descriptions[tool_name]}\n"
+        
+        prompt += """
+Analyze and return JSON with:
+
+{
+    "task_type": "text_generation|api_request|web_scraping|search|general",
+    "query_params": {"limit": 10, "sort": "id"},  // Extract if present (e.g., "latest 10")
+    "required_tools": ["tool1", "tool2"],  // Which tools needed
+    "required_fields": ["field1", "field2"],  // What data to extract (if applicable)
+    "task_structure": {
+        "type": "sequential|parallel|single",
+        "steps": [
+            {"description": "step1 description", "tool": "tool_name"}
+        ]  // For multi-step: include tool assignment
+    }
+}
+
+Available Tools:
+- google_search: Search Google for information
+- chart_extractor: Extract structured data (tables, lists) from webpages
+- playwright_execute: Automate browser (navigate, click, fill forms)
+- api_call: Make HTTP API requests
+
+Tool Selection Rules:
+- "search", "find", "identify", "look up" → google_search
+- "extract", "get data", "scrape", "table" → chart_extractor
+- "navigate", "click", "fill", "browser" → playwright_execute
+- "API", "HTTP request", "endpoint" → api_call
+
+Examples:
+
+1. "Get weather for Seattle, then suggest activity"
+{
+    "task_type": "search",
+    "query_params": {},
+    "required_tools": ["google_search"],
+    "required_fields": ["temperature", "condition", "activity_name"],
+    "task_structure": {
+        "type": "sequential",
+        "steps": [
+            {
+                "description": "Get current weather for Seattle",
+                "tool": "google_search",
+                "parameters": {"query": "weather Seattle"}
+            },
+            {
+                "description": "Suggest activity based on weather",
+                "tool": "google_search",
+                "parameters": {"query": "outdoor activities Seattle"}
+            }
+        ]
+    }
+}
+
+2. "Search Amazon for phones, extract top 3 with prices"
+{
+    "task_type": "web_scraping",
+    "query_params": {"limit": 3},
+    "required_tools": ["google_search", "chart_extractor"],
+    "required_fields": ["name", "price", "rating"],
+    "task_structure": {
+        "type": "sequential",
+        "steps": [
+            {
+                "description": "Search Amazon for phones",
+                "tool": "google_search",
+                "parameters": {"query": "Amazon phones"}
+            },
+            {
+                "description": "Extract name, price, rating from results",
+                "tool": "chart_extractor",
+                "parameters": {
+                    "required_fields": ["name", "price", "rating"],
+                    "limit": 3
+                }
+            }
+        ]
+    }
+}
+
+3. "Get latest 10 posts from API"
+{
+    "task_type": "api_request",
+    "query_params": {"limit": 10, "sort": "id", "order": "desc"},
+    "required_tools": ["api_call"],
+    "required_fields": ["id", "title", "body"],
+    "task_structure": {
+        "type": "single",
+        "steps": [
+            {
+                "description": "Get latest 10 posts from API",
+                "tool": "api_call",
+                "parameters": {
+                    "endpoint": "/posts",
+                    "method": "GET",
+                    "params": {"limit": 10, "sort": "id", "order": "desc"}
+                }
+            }
+        ]
+    }
+}
+
+4. "Go to eventbrite.com and search for free events"
+{
+    "task_type": "web_scraping",
+    "query_params": {"filter": "free"},
+    "required_tools": ["playwright_execute", "chart_extractor"],
+    "required_fields": ["event_name", "event_date", "event_location"],
+    "task_structure": {
+        "type": "sequential",
+        "steps": [
+            {
+                "description": "Navigate to Eventbrite website",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "goto",
+                    "url": "https://www.eventbrite.com"
+                }
+            },
+            {
+                "description": "Search for free events",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "fill",
+                    "selector_hint": "search_input",
+                    "args": {"value": "free events"}
+                }
+            },
+            {
+                "description": "Submit search",
+                "tool": "playwright_execute",
+                "parameters": {
+                    "method": "press",
+                    "selector_hint": "search_input",
+                    "args": {"key": "Enter"}
+                }
+            },
+            {
+                "description": "Extract event data",
+                "tool": "chart_extractor",
+                "parameters": {
+                    "required_fields": ["event_name", "event_date", "event_location"]
+                }
+            }
+        ]
+    }
+}
+
+Return ONLY valid JSON (no markdown, no explanation):"""
+        
+        try:
+            print("[REASON] 🎯 Comprehensive analysis (1 LLM call)")
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content.strip()
+            
+            # Extract JSON
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                analysis = json.loads(json_match.group())
+                
+                # DEBUG LOGGING
+                print(f"[REASON] 🔍 DEBUG: Full analysis from LLM:")
+                print(f"[REASON] 🔍   - task_type: {analysis.get('task_type')}")
+                print(f"[REASON] 🔍   - required_tools: {analysis.get('required_tools')}")
+                print(f"[REASON] 🔍   - task_structure: {analysis.get('task_structure')}")
+                print(f"[REASON] 🔍   - task_structure.type: {analysis.get('task_structure', {}).get('type')}")
+                print(f"[REASON] 🔍   - task_structure.steps: {analysis.get('task_structure', {}).get('steps')}")
+                
+                print(f"[REASON] ✓ Analysis complete: type={analysis.get('task_type')}, tools={len(analysis.get('required_tools', []))}, structure={analysis.get('task_structure', {}).get('type')}")
+                return analysis
+            else:
+                print("[REASON] ✗ Could not parse LLM response")
+                return None
+                
+        except Exception as e:
+            print(f"[REASON] ✗ Comprehensive analysis failed: {e}")
+            return None
+    
+    def _extract_query_params(self, description: str) -> Dict[str, Any]:
+        """
+        Use LLM to extract query parameters from description.
+        
+        Example: "Get latest 10 posts" → {"limit": 10, "sort": "id", "order": "desc"}
+        
+        Args:
+            description: Task description
+            
+        Returns:
+            Dictionary of query parameters
+        """
+        if not self.llm_service:
+            return {}
+        
+        prompt = f"""Extract API query parameters from this request.
+
+Request: "{description}"
+
+Common patterns:
+- "latest N" → {{"limit": N, "sort": "id", "order": "desc"}}
+- "top N" → {{"limit": N, "sort": "rank", "order": "asc"}}
+- "first N" → {{"limit": N}}
+
+Return ONLY a JSON object with parameters, or {{}} if none needed.
+
+JSON:"""
+        
+        try:
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content.strip()
+            
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception as e:
+            print(f"[REASON] Query param extraction failed: {e}")
+        
+        return {}
+    
+    def _detect_task_type(self, description: str) -> str:
+        """
+        Detect task type by matching against tool capabilities from registry.
+        Uses LLM to understand which tools would be appropriate.
+        NO HARDCODING - adapts to available tools.
+        
+        Args:
+            description: Task description
+            
+        Returns:
+            Task type string
+        """
+        # Get tool descriptions from registry
+        tool_descriptions = self._get_tool_descriptions()
+        
+        if not tool_descriptions or not self.llm_service:
+            return "general"
+        
+        # Build prompt with tool capabilities
+        prompt = f"""Analyze this task and determine its type based on available tool capabilities.
+
+Task: "{description}"
+
+Available Tools:
+"""
+        for tool_name, tool_desc in tool_descriptions.items():
+            prompt += f"- {tool_name}: {tool_desc}\n"
+        
+        prompt += """
+Based on the tools available, what type of task is this?
+
+Types:
+- text_generation: No tools needed, pure text generation (emails, writing, etc.)
+- api_request: Needs API calls or HTTP requests
+- web_scraping: Needs browser automation or web scraping
+- search: Needs web search
+- general: Other tasks
+
+Return ONLY the type name (one word).
+
+Type:"""
+        
+        try:
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            task_type = response.content.strip().lower()
+            
+            # Validate response
+            valid_types = ["text_generation", "api_request", "web_scraping", "search", "general"]
+            if task_type in valid_types:
+                print(f"[REASON] Detected task type: {task_type}")
+                return task_type
+            else:
+                print(f"[REASON] Invalid task type '{task_type}', defaulting to general")
+                return "general"
+        except Exception as e:
+            print(f"[REASON] Task type detection failed: {e}")
+            return "general"
     
     def _get_tool_descriptions(self) -> Dict[str, str]:
         """
@@ -732,16 +1063,18 @@ Return ONLY valid JSON:"""
     def _create_plan(self, task: AgentTask, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create execution plan based on analysis.
+        Uses pre-analyzed data to avoid additional LLM calls.
         
         Args:
             task: Task to plan for
-            analysis: Task analysis
+            analysis: Task analysis (already contains fields, structure, etc.)
             
         Returns:
             Execution plan
         """
         required_tools = analysis.get("required_tools", [])
         complexity = analysis.get("complexity", "simple")
+        task_structure = analysis.get("task_structure", {"type": "single"})
         
         plan = {
             "needs_delegation": len(required_tools) > 0,
@@ -749,24 +1082,66 @@ Return ONLY valid JSON:"""
             "subtasks": [],
             "needs_follow_up_extraction": False,
             "required_fields": [],
-            "original_task_id": task.task_id
+            "original_task_id": task.task_id,
+            "task_structure": task_structure,  # Pass structure to decomposer
+            "has_explicit_extraction": any(
+                tool in ["chart_extractor", "playwright_execute", "extract_data", "extract_structured"]
+                for tool in required_tools
+            )
         }
         
-        # Check if structured extraction needed (LLM-based)
-        if self._needs_structured_extraction(task.description):
-            print("[REASON] Task needs structured extraction")
-            
-            # Extract required fields (LLM-based)
-            required_fields = self._extract_required_fields_llm(task.description)
+        # Use pre-analyzed required fields (no additional LLM call)
+        required_fields = analysis.get("required_fields", [])
+        if required_fields:
+            print(f"[REASON] Using pre-analyzed fields: {required_fields}")
             plan["needs_follow_up_extraction"] = True
             plan["required_fields"] = required_fields
-            
-            print(f"[REASON] Will extract fields: {required_fields}")
         
-        # Use LLM-based decomposer for playwright tasks
+        # HYBRID APPROACH: Use decomposer if we have structured steps from analysis
+        if task_structure.get("steps"):
+            num_steps = len(task_structure.get("steps", []))
+            print(f"[REASON] Found {num_steps} pre-analyzed steps, using decomposer")
+            
+            # Pass comprehensive context to decomposer
+            decomposer_context = {
+                "query_params": analysis.get("query_params", {}),
+                "task_type": analysis.get("detected_type", "general"),
+                "task_structure": task_structure,
+                "required_fields": required_fields
+            }
+            
+            decomposed_subtasks = self.task_decomposer.decompose(
+                task.description, 
+                task.task_id, 
+                decomposer_context
+            )
+            
+            if decomposed_subtasks:
+                print(f"[REASON] ✓ Decomposer created {len(decomposed_subtasks)} subtasks")
+                plan["subtasks"] = decomposed_subtasks
+                
+                # Log the plan
+                print(f"\n{'='*60}")
+                print(f"📋 EXECUTION PLAN ({len(plan['subtasks'])} steps)")
+                for idx, subtask in enumerate(plan['subtasks'], 1):
+                    print(f"  {idx}. {subtask['tool']}: {subtask.get('parameters', {})}")
+                print(f"{'='*60}\n")
+                
+                return plan
+            else:
+                print("[REASON] ⚠️ Decomposer returned nothing, using fallback logic")
+        
+        # FALLBACK: Use existing logic for playwright-specific or other cases
         if "playwright_execute" in required_tools:
             print("[REASON] Using LLM-based task decomposer for playwright")
-            decomposed_subtasks = self.task_decomposer.decompose(task.description, task.task_id)
+            # Pass comprehensive context including task structure
+            decomposer_context = {
+                "query_params": analysis.get("query_params", {}),
+                "task_type": analysis.get("detected_type", "general"),
+                "task_structure": task_structure,  # Pass pre-analyzed structure
+                "required_fields": required_fields  # Pass pre-analyzed fields
+            }
+            decomposed_subtasks = self.task_decomposer.decompose(task.description, task.task_id, decomposer_context)
             
             if decomposed_subtasks:
                 plan["subtasks"] = decomposed_subtasks
@@ -1108,11 +1483,11 @@ Return ONLY valid JSON:"""
                 
                 await browser.close()
                 
-                # Filter successful results
-                successful = [
-                    r for r in results 
-                    if not isinstance(r, Exception) and r.get('success')
-                ]
+                # Filter successful results (only dicts, not exceptions)
+                successful: List[Dict[str, Any]] = []
+                for r in results:
+                    if not isinstance(r, Exception) and isinstance(r, dict) and r.get('success'):
+                        successful.append(r)
                 
                 print(f"[REASON] ✅ Parallel extraction complete: {len(successful)}/{len(urls)} URLs")
                 return successful
@@ -1243,25 +1618,8 @@ Return ONLY valid JSON:"""
         results = []
         previous_result = None
         
-        # Filter out invalid tasks before execution
-        valid_subtasks = []
-        for subtask in subtasks:
-            # Skip playwright tasks with no URL
-            if subtask["tool"] == "playwright_execute":
-                url = subtask["parameters"].get("url")
-                if not url or url == "None":
-                    print(f"[REASON] ⚠️ Skipping playwright task with no URL")
-                    continue
-            valid_subtasks.append(subtask)
-        
-        if not valid_subtasks:
-            print(f"[REASON] ⚠️ No valid subtasks to execute after filtering")
-            return results
-        
-        subtasks = valid_subtasks
-        
         # NEW: Track follow-ups per tool to prevent infinite loops
-        MAX_FOLLOW_UPS_PER_TOOL = 3
+        MAX_FOLLOW_UPS_PER_TOOL = 5
         follow_up_counts = {}  # {tool_name: count}
         previous_coverage = {}  # {tool_name: coverage_percentage}
         
@@ -1269,32 +1627,15 @@ Return ONLY valid JSON:"""
         extraction_tasks_added = False
         
         for i, subtask in enumerate(subtasks):
-            print(f"\n[REASON] === Subtask {i+1}/{len(subtasks)}: {subtask['tool']} ===")
-            print(f"[REASON] Initial params: {subtask['parameters']}")
-            
-            self.log(f"[REASON] === Subtask {i+1}/{len(subtasks)}: {subtask['tool']} ===")
-            self.log(f"[REASON] Initial params: {subtask['parameters']}")
+            print(f"[REASON] === Subtask {i+1}/{len(subtasks)}: {subtask['tool']} ===")
             
             # Update parameters based on previous result
             if previous_result and previous_result.get("success"):
-                print(f"[REASON] Chaining from previous result (tool: {previous_result.get('tool')})")
-                self.log(f"[REASON] Chaining from previous result (tool: {previous_result.get('tool')})")
-                
                 subtask["parameters"] = self._chain_parameters(
                     subtask["tool"],
                     subtask["parameters"],
                     previous_result
                 )
-                
-                print(f"[REASON] After chaining params: {subtask['parameters']}")
-                self.log(f"[REASON] After chaining params: {subtask['parameters']}")
-            else:
-                if previous_result:
-                    print(f"[REASON] Previous result failed, not chaining")
-                    self.log(f"[REASON] Previous result failed, not chaining")
-                else:
-                    print(f"[REASON] First subtask, no previous result")
-                    self.log(f"[REASON] First subtask, no previous result")
             
             # Find executor agent that can handle this tool
             # print(f"[REASON] Looking for executor for tool: {subtask['tool']}")
@@ -1337,17 +1678,10 @@ Return ONLY valid JSON:"""
                 "total_subtasks": len(subtasks)
             }
             
-            # print(f"[REASON] About to call executor.execute()...")
-            # print(f"[REASON] Executor ID: {executor.agent_id}")
-            # print(f"[REASON] Executor type: {type(executor)}")
-            
             # Execute through executor agent with context
             try:
-                print(f"[REASON] Calling executor.execute() NOW...")
                 result = executor.execute(task, context=execution_context)
-                print(f"[REASON] executor.execute() returned!")
-                print(f"[REASON] Result success: {result.success}")
-                print(f"[REASON] Result data: {str(result.data)[:200]}...")
+                print(f"[REASON] ✓ Subtask {i+1}/{len(subtasks)}: {subtask['tool']} - {result.success}")
                 
                 result_entry = {
                     "subtask_id": subtask["subtask_id"],
@@ -1362,11 +1696,13 @@ Return ONLY valid JSON:"""
                 self.log(f"Subtask completed: {subtask['tool']} - Success: {result.success}")
                 
                 # NEW: Auto-extraction after search completes WITH PARALLEL EXECUTION!
+                # Only run if NO explicit extraction tool in plan
                 if (result.success and 
                     subtask["tool"] == "google_search" and 
                     plan and 
                     plan.get("needs_follow_up_extraction") and 
-                    not extraction_tasks_added):
+                    not extraction_tasks_added and
+                    not plan.get("has_explicit_extraction", False)):
                     
                     print("[REASON] ✨ Auto-creating PARALLEL extraction from search results")
                     

@@ -1,0 +1,16 @@
+{
+  "playwright_execute": {
+    "search_input": {
+      "best": "#search-autocomplete-input",
+      "selectors": {
+        "#search-autocomplete-input": {
+          "success": 26,
+          "fail": 0,
+          "last_used": 1761866682.1444182,
+          "avg_response_time": 1.245650804959811
+        }
+      },
+      "fallbacks": []
+    }
+  }
+}

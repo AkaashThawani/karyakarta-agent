@@ -767,6 +767,36 @@
     ],
     "requires_selector": false
   },
+  "api_call": {
+    "tool": "api_call",
+    "method": "request",
+    "description": "Make HTTP API requests (GET/POST) with query parameters and JSON responses",
+    "actions": [
+      "api_call",
+      "http_request",
+      "get",
+      "post"
+    ],
+    "selector_hints": [],
+    "keywords": [
+      "api",
+      "http",
+      "rest",
+      "endpoint",
+      "json",
+      "request",
+      "get data",
+      "post data"
+    ],
+    "requires_selector": false,
+    "parameters": {
+      "url": "string - API endpoint URL (required)",
+      "method": "string - HTTP method GET or POST (default: GET)",
+      "params": "object - Query parameters (optional)",
+      "headers": "object - Request headers (optional)",
+      "body": "object - Request body for POST (optional)"
+    }
+  },
   "google_search": {
     "tool": "google_search",
     "method": "query",

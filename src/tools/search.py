@@ -201,7 +201,8 @@ OUTPUT: Formatted, relevant search results"""
             formatted_result = self._format_search_results(raw_result_str, query, num_results)
             
             print(f"[SEARCH] Formatted result length: {len(formatted_result)} characters")
-            print(f"[SEARCH] Compression: {(1 - len(formatted_result)/len(raw_result)) * 100:.1f}%")
+            reduction_pct = (1 - len(formatted_result)/len(raw_result_str)) * 100
+            print(f"[SEARCH] Size reduction: {reduction_pct:.1f}%")
             
             if self.logger:
                 self.logger.status("Google search completed")

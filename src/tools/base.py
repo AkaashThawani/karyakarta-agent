@@ -107,8 +107,13 @@ class BaseTool(ABC):
             ToolResult with success status and data or error
         """
         try:
+            # DEBUG: Log parameters being passed
+            print(f"[{self.name}] execute() called with parameters: {kwargs}")
+            
             # Validate parameters
             if not self.validate_params(**kwargs):
+                print(f"[{self.name}] ❌ Parameter validation FAILED!")
+                print(f"[{self.name}] ❌ Parameters were: {kwargs}")
                 return ToolResult(
                     success=False,
                     error="Invalid parameters provided",

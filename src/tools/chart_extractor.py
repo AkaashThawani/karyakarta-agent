@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 import json
 import re
+import asyncio
 
 
 class PatternCache:
@@ -127,16 +128,39 @@ class PlaywrightChartExtractor:
         print(f"\n[EXTRACT] Starting extraction from {domain}")
         print(f"[EXTRACT] Required fields: {required_fields}")
         
+        # NEW: Check if page actually loaded (Fix for failed playwright_execute navigation)
+        current_url = page.url
+        if current_url == "about:blank" or domain not in current_url:
+            print(f"[EXTRACT] ⚠️ Page not loaded (URL: {current_url}), navigating now...")
+            try:
+                await page.goto(url, wait_until='domcontentloaded', timeout=10000)
+                print(f"[EXTRACT] ✅ Navigation successful")
+            except Exception as nav_error:
+                print(f"[EXTRACT] ❌ Navigation failed: {nav_error}")
+                raise Exception(f"Failed to navigate to {url}: {nav_error}")
+        
+        # Quick wait for content to load (2s max)
+        try:
+            await page.wait_for_selector('div[class*="event"], article, [data-event]', timeout=2000)
+        except:
+            pass  # Continue anyway
+        
+        print(f"[EXTRACT] ✅ Page ready, starting extraction")
+        
         # NEW: Step 0 - Try UniversalExtractor first!
         print(f"[EXTRACT] 🚀 Trying UniversalExtractor (extract everything, then search)...")
         try:
             from src.tools.universal_extractor import UniversalExtractor, SmartSearcher
             
-            html = await page.content()
+            # CRITICAL: Wrap page.content() in timeout!
+            html = await asyncio.wait_for(page.content(), timeout=5.0)
             
-            # Extract EVERYTHING
+            # Extract EVERYTHING with 30 second timeout
             extractor = UniversalExtractor()
-            all_data = extractor.extract_everything(html, url)
+            all_data = await asyncio.wait_for(
+                asyncio.to_thread(extractor.extract_everything, html, url),
+                timeout=30.0
+            )
             
             print(f"[EXTRACT] Extracted:")
             print(f"  - {all_data['summary']['tables_count']} tables")
@@ -144,65 +168,52 @@ class PlaywrightChartExtractor:
             print(f"  - {all_data['summary']['cards_count']} cards")
             print(f"  - {all_data['summary']['total_elements']} total elements")
             
+            # DEBUG: Save full extraction dump
+            try:
+                from pathlib import Path
+                dump_path = Path(__file__).parent.parent.parent / 'extraction_dump.json'
+                with open(dump_path, 'w', encoding='utf-8') as f:
+                    json.dump(all_data, f, indent=2, ensure_ascii=False)
+                print(f"[EXTRACT] 📝 Saved full dump to: {dump_path}")
+            except Exception as e:
+                print(f"[EXTRACT] Failed to save dump: {e}")
+            
+            # DEBUG: Print sample cards
+            cards = all_data.get('cards', [])
+            print(f"\n[EXTRACT] 📊 Sample of first 5 cards:")
+            for i, card in enumerate(cards[:5]):
+                print(f"  Card {i+1}: {json.dumps(card, ensure_ascii=False)[:200]}...")
+            print()
+            
             # Search for relevant data
             searcher = SmartSearcher()
             query = ' '.join(required_fields)  # Build query from fields
             records = searcher.search(all_data, query, required_fields)
             
+            # If search found matches, return them
             if records and len(records) >= 3:
-                print(f"[EXTRACT] ✅ UniversalExtractor found {len(records)} records!")
-                
-                # NEW: Check completeness before returning
-                if required_fields:
-                    validation = self._validate_completeness(records, required_fields, url)
-                    if not validation['complete']:
-                        print(f"[EXTRACT] ⚠️ Data incomplete: {validation['missing_fields']}")
-                        print(f"[EXTRACT] Coverage: {validation['coverage']*100:.0f}%")
-                        # Still return partial data - caller will handle follow-up
-                
-                return records[:10]
-            else:
-                print(f"[EXTRACT] UniversalExtractor found insufficient data, trying pandas...")
+                print(f"[EXTRACT] ✅ SmartSearcher found {len(records)} matching records!")
+                return records[:50]
+            
+            # If search didn't find matches but we have cards, return them anyway
+            # Let synthesis LLM do the smart filtering
+            if all_data.get('cards') and len(all_data['cards']) >= 3:
+                print(f"[EXTRACT] SmartSearcher found no matches, but returning {len(all_data['cards'])} cards for LLM synthesis")
+                return all_data['cards'][:50]
+            
+            print(f"[EXTRACT] UniversalExtractor found insufficient data")
         except Exception as e:
             print(f"[EXTRACT] UniversalExtractor failed: {e}")
         
-        # NEW: Step 0.5 - Try pandas.read_html() for tables
-        try:
-            import pandas as pd
-            from io import StringIO
-            
-            html = await page.content()
-            # Use lxml parser (already installed) instead of html5lib
-            tables = pd.read_html(StringIO(html), flavor='lxml')
-            
-            if tables:
-                print(f"[EXTRACT] 📊 pandas found {len(tables)} tables")
-                
-                # Find best table (most rows)
-                best_table = max(tables, key=len)
-                
-                if len(best_table) >= 3:
-                    records = best_table.to_dict('records')
-                    
-                    # Clean column names
-                    records = [
-                        {str(k).strip(): str(v).strip() for k, v in record.items()}
-                        for record in records
-                    ]
-                    
-                    print(f"[EXTRACT] ✅ pandas extracted {len(records)} records!")
-                    return records[:10]
-        except Exception as e:
-            print(f"[EXTRACT] pandas failed: {e}")
-        
         # NEW: Check if this is a new site
         cached = self.cache.get_pattern(domain)
-        if not cached:
-            print(f"[EXTRACT] 🆕 New site detected: {domain}")
-            print(f"[EXTRACT] 🧠 Running Site Intelligence first...")
-            await self._run_site_intelligence(page, url, required_fields)
-            # Reload cache after intelligence runs
-            cached = self.cache.get_pattern(domain)
+        # DISABLED: Site Intelligence (stuck/slow - needs more capable agent)
+        # if not cached:
+        #     print(f"[EXTRACT] 🆕 New site detected: {domain}")
+        #     print(f"[EXTRACT] 🧠 Running Site Intelligence first...")
+        #     await self._run_site_intelligence(page, url, required_fields)
+        #     # Reload cache after intelligence runs
+        #     cached = self.cache.get_pattern(domain)
         
         # Step 1: Try cached selectors
         if cached:
@@ -213,42 +224,44 @@ class PlaywrightChartExtractor:
                 print(f"[EXTRACT] ✅ Cached pattern worked!")
                 return records
         
-        # Step 2: Try Playwright locators
-        print(f"[EXTRACT] Trying Playwright locators...")
-        records = await self._extract_with_locators(page, required_fields)
-        if records:
-            validation = self._validate_completeness(records, required_fields, url)
-            if validation.get('coverage', 0.0) >= 0.6:
-                print(f"[EXTRACT] ✅ Playwright locators worked!")
-                # Cache successful pattern
-                if self.last_successful_pattern:
-                    self.cache.save_pattern(
-                        domain,
-                        self.last_successful_pattern,
-                        list(records[0].keys()) if records else []
-                    )
-                
-                # Check if we need LLM for missing fields
-                if not validation.get('complete', False):
-                    coverage = validation.get('coverage', 0.0)
-                    print(f"[EXTRACT] Coverage: {coverage*100:.0f}%, using LLM for missing fields...")
-                    records = await self._llm_fill_missing_fields(page, records, required_fields)
-                
-                return records
+        # DISABLED: Playwright locators - causes hangs, UniversalExtractor already extracts everything
+        # print(f"[EXTRACT] Trying Playwright locators...")
+        # records = await self._extract_with_locators(page, required_fields)
+        # if records:
+        #     validation = self._validate_completeness(records, required_fields, url)
+        #     if validation.get('coverage', 0.0) >= 0.6:
+        #         print(f"[EXTRACT] ✅ Playwright locators worked!")
+        #         if self.last_successful_pattern:
+        #             self.cache.save_pattern(
+        #                 domain,
+        #                 self.last_successful_pattern,
+        #                 list(records[0].keys()) if records else []
+        #             )
+        #         
+        #         if not validation.get('complete', False):
+        #             coverage = validation.get('coverage', 0.0)
+        #             print(f"[EXTRACT] Coverage: {coverage*100:.0f}%, using LLM for missing fields...")
+        #             records = await self._llm_fill_missing_fields(page, records, required_fields)
+        #         
+        #         return records
         
-        # Step 3: Try heuristic patterns
-        print(f"[EXTRACT] Trying heuristic patterns...")
-        records = await self._extract_with_heuristics(page, required_fields)
-        if records:
-            validation = self._validate_completeness(records, required_fields, url)
-            coverage = validation.get('coverage', 0.0)
-            print(f"[EXTRACT] Heuristic extraction coverage: {coverage*100:.0f}%")
-            
-            if not validation.get('complete', False):
-                print(f"[EXTRACT] Using LLM for missing fields...")
-                records = await self._llm_fill_missing_fields(page, records, required_fields)
-            
-            return records
+        # DISABLED: Heuristics - Let synthesis LLM handle filtering
+        # print(f"[EXTRACT] Trying heuristic patterns...")
+        # try:
+        #     records = await self._extract_with_heuristics(page, required_fields)
+        # except asyncio.TimeoutError:
+        #     print(f"[EXTRACT] ⚠️ Heuristic extraction timeout")
+        #     records = []
+        # if records:
+        #     validation = self._validate_completeness(records, required_fields, url)
+        #     coverage = validation.get('coverage', 0.0)
+        #     print(f"[EXTRACT] Heuristic extraction coverage: {coverage*100:.0f}%")
+        #     
+        #     if not validation.get('complete', False):
+        #         print(f"[EXTRACT] Using LLM for missing fields...")
+        #         records = await self._llm_fill_missing_fields(page, records, required_fields)
+        #     
+        #     return records
         
         # Step 4: Full LLM fallback
         print(f"[EXTRACT] All scraping failed, using full LLM extraction...")
@@ -513,7 +526,8 @@ class PlaywrightChartExtractor:
         required_fields: List[str]
     ) -> List[Dict[str, Any]]:
         """Extract using heuristic patterns."""
-        html = await page.content()
+        # CRITICAL: Wrap page.content() in timeout!
+        html = await asyncio.wait_for(page.content(), timeout=5.0)
         
         from src.tools.element_parser import ElementParser
         parser = ElementParser()
@@ -595,7 +609,8 @@ class PlaywrightChartExtractor:
         print(f"[EXTRACT] LLM filling missing fields: {missing_fields}")
         
         try:
-            html = await page.content()
+            # CRITICAL: Wrap page.content() in timeout!
+            html = await asyncio.wait_for(page.content(), timeout=5.0)
             tree = HTMLParser(html)
             
             # Remove scripts/styles
@@ -654,7 +669,8 @@ JSON:"""
         print(f"[EXTRACT] Using full LLM extraction...")
         
         try:
-            html = await page.content()
+            # CRITICAL: Wrap page.content() in timeout!
+            html = await asyncio.wait_for(page.content(), timeout=5.0)
             tree = HTMLParser(html)
             
             for tag in tree.css('script, style'):

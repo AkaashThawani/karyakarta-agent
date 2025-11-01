@@ -97,23 +97,15 @@ class ExecutorAgent(BaseAgent):
         
         try:
             # Find appropriate tool
-            print(f"[EXECUTOR] Finding tool for task type: {task.task_type}")
             tool = self._find_tool_for_task(task)
             
             if not tool:
-                print(f"[EXECUTOR] ERROR: No tool found for: {task.task_type}")
+                print(f"[EXECUTOR] ✗ No tool found for: {task.task_type}")
                 raise ValueError(f"No tool found for task type: {task.task_type}")
             
-            print(f"[EXECUTOR] Found tool: {tool.name}")
-            print(f"[EXECUTOR] Tool type: {type(tool)}")
-            self.log(f"Using tool: {tool.name}")
-            
             # Execute tool with retry logic
-            print(f"[EXECUTOR] Calling tool.execute() with parameters: {task.parameters}")
             tool_result = self._execute_with_retry(tool, task.parameters)
-            print(f"[EXECUTOR] Tool returned - Success: {tool_result.success}")
-            print(f"[EXECUTOR] Tool result type: {type(tool_result.data)}")
-            print(f"[EXECUTOR] Tool result data: {str(tool_result.data)[:300]}...")
+            print(f"[EXECUTOR] ✓ {tool.name}: Success={tool_result.success}, Type={type(tool_result.data).__name__}")
             
             # Update stats
             self._update_stats(tool.name, tool_result.success)
@@ -260,7 +252,10 @@ class ExecutorAgent(BaseAgent):
                 wait_time = 2 ** attempt  # 1s, 2s, 4s
                 time.sleep(wait_time)
         
-        # All retries failed
+        # All retries failed - PRINT THE ERROR!
+        print(f"[EXECUTOR] ❌ Tool {tool.name} failed after {self.max_retries} attempts")
+        print(f"[EXECUTOR] ❌ Last error: {last_error}")
+        
         return ToolResult(
             success=False,
             error=f"Tool execution failed after {self.max_retries} attempts. Last error: {last_error}",

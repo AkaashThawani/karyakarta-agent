@@ -69,6 +69,7 @@ class UniversalPlaywrightTool(BaseTool):
     _playwright_instances = {}
     _event_loops = {}
     _loop_threads = {}
+    _stop_flags = {}  # Track when to stop event loops
     
     def __init__(self, session_id: str = "default", logger: Optional[LoggingService] = None, settings: Optional[Any] = None):
         super().__init__(logger)
@@ -82,9 +83,10 @@ class UniversalPlaywrightTool(BaseTool):
             # Create new event loop
             loop = asyncio.new_event_loop()
             UniversalPlaywrightTool._event_loops[session_id] = loop
+            UniversalPlaywrightTool._stop_flags[session_id] = False
             
             # Start thread to run the loop
-            thread = threading.Thread(target=self._run_loop_forever, args=(loop,), daemon=True)
+            thread = threading.Thread(target=self._run_loop_forever, args=(loop, session_id), daemon=True)
             thread.start()
             UniversalPlaywrightTool._loop_threads[session_id] = thread
             
@@ -97,10 +99,20 @@ class UniversalPlaywrightTool(BaseTool):
             UniversalPlaywrightTool._playwright_instances[session_id] = None
     
     @staticmethod
-    def _run_loop_forever(loop):
-        """Run event loop forever in background thread."""
+    def _run_loop_forever(loop, session_id):
+        """Run event loop until stop is requested."""
         asyncio.set_event_loop(loop)
-        loop.run_forever()
+        try:
+            # Run until stop flag is set
+            async def wait_for_stop():
+                while not UniversalPlaywrightTool._stop_flags.get(session_id, False):
+                    await asyncio.sleep(0.1)
+            
+            loop.run_until_complete(wait_for_stop())
+        except Exception as e:
+            print(f"[PLAYWRIGHT] Event loop error for {session_id}: {e}")
+        finally:
+            print(f"[PLAYWRIGHT] Event loop stopped for {session_id}")
     
     def run_async(self, coro):
         """Submit coroutine to persistent event loop and wait for result."""
@@ -110,6 +122,30 @@ class UniversalPlaywrightTool(BaseTool):
         
         future = asyncio.run_coroutine_threadsafe(coro, loop)
         return future.result()
+    
+    @classmethod
+    def stop_all_loops(cls):
+        """Stop all event loops gracefully."""
+        print("[PLAYWRIGHT] Stopping all event loops...")
+        for session_id in list(cls._stop_flags.keys()):
+            cls._stop_flags[session_id] = True
+            print(f"[PLAYWRIGHT] Signaled stop for session: {session_id}")
+        
+        # Wait for threads to finish (with timeout)
+        import time
+        max_wait = 2.0  # 2 seconds max
+        start_time = time.time()
+        
+        for session_id, thread in list(cls._loop_threads.items()):
+            remaining = max_wait - (time.time() - start_time)
+            if remaining > 0 and thread.is_alive():
+                thread.join(timeout=remaining)
+                if not thread.is_alive():
+                    print(f"[PLAYWRIGHT] Thread stopped for session: {session_id}")
+                else:
+                    print(f"[PLAYWRIGHT] Thread timeout for session: {session_id}")
+        
+        print("[PLAYWRIGHT] All event loops stopped")
     
     @property
     def _browser(self):
@@ -494,9 +530,9 @@ class UniversalPlaywrightTool(BaseTool):
                 
                 self._page = await self._browser.new_page()
                 
-                # Set global 4 second timeout for all operations
-                self._page.set_default_timeout(4000)
-                print(f"[PLAYWRIGHT] ✅ Browser created successfully with 4s timeout - browser={self._browser is not None}, page={self._page is not None}")
+                # Set global 10 second timeout for all operations
+                self._page.set_default_timeout(10000)
+                print(f"[PLAYWRIGHT] ✅ Browser created successfully with 10s timeout - browser={self._browser is not None}, page={self._page is not None}")
                 
                 # Notify frontend that browser is active
                 if self.logger:

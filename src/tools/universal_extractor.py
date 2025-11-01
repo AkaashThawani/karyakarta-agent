@@ -34,6 +34,16 @@ class UniversalExtractor:
         
         return loop.run_until_complete(self.extract_everything_async(html, url))
     
+    async def _extract_with_logging(self, method_name: str, func, *args):
+        """Wrapper to add logging before/after extraction methods"""
+        # Removed excessive logging - only log on error
+        try:
+            result = await asyncio.to_thread(func, *args)
+            return result
+        except Exception as e:
+            print(f"[EXTRACT] ❌ Failed {method_name}: {e}")
+            raise
+    
     async def extract_everything_async(self, html: str, url: str = '') -> Dict[str, Any]:
         """
         Extract ALL elements in PARALLEL with 2-minute timeout.
@@ -48,24 +58,24 @@ class UniversalExtractor:
         tree = HTMLParser(html)
         
         try:
-            # Run ALL 13 extractions in parallel with 2-minute timeout!
-            async with asyncio.timeout(120):  # 2 minutes
-                print(f"[EXTRACT] 🚀 Starting parallel extraction of 13 element types")
+            # Run ALL 13 extractions in parallel with 30-second timeout!
+            async with asyncio.timeout(30):  # 30 seconds
+                print(f"[EXTRACT] 🚀 Starting parallel extraction of 13 element types (30s timeout)")
                 
                 results = await asyncio.gather(
-                    asyncio.to_thread(self._extract_metadata, tree, url),
-                    asyncio.to_thread(self._extract_links, tree),
-                    asyncio.to_thread(self._extract_images, tree),
-                    asyncio.to_thread(self._extract_tables, tree),
-                    asyncio.to_thread(self._extract_lists, tree),
-                    asyncio.to_thread(self._extract_forms, tree),
-                    asyncio.to_thread(self._extract_buttons, tree),
-                    asyncio.to_thread(self._extract_cards, tree),
-                    asyncio.to_thread(self._extract_divs, tree),
-                    asyncio.to_thread(self._extract_spans, tree),
-                    asyncio.to_thread(self._extract_headings, tree),
-                    asyncio.to_thread(self._extract_paragraphs, tree),
-                    asyncio.to_thread(self._extract_data_attributes, tree),
+                    self._extract_with_logging('extract_metadata', self._extract_metadata, tree, url),
+                    self._extract_with_logging('extract_links', self._extract_links, tree),
+                    self._extract_with_logging('extract_images', self._extract_images, tree),
+                    self._extract_with_logging('extract_tables', self._extract_tables, tree),
+                    self._extract_with_logging('extract_lists', self._extract_lists, tree),
+                    self._extract_with_logging('extract_forms', self._extract_forms, tree),
+                    self._extract_with_logging('extract_buttons', self._extract_buttons, tree),
+                    self._extract_with_logging('extract_cards', self._extract_cards, tree),
+                    self._extract_with_logging('extract_divs', self._extract_divs, tree),
+                    self._extract_with_logging('extract_spans', self._extract_spans, tree),
+                    self._extract_with_logging('extract_headings', self._extract_headings, tree),
+                    self._extract_with_logging('extract_paragraphs', self._extract_paragraphs, tree),
+                    self._extract_with_logging('extract_data_attributes', self._extract_data_attributes, tree),
                     return_exceptions=True
                 )
                 
@@ -91,7 +101,7 @@ class UniversalExtractor:
                 return result
                 
         except asyncio.TimeoutError:
-            print(f"[EXTRACT] ⚠️ Timeout after 2 minutes - returning empty result")
+            print(f"[EXTRACT] ⚠️ Timeout after 30 seconds - returning empty result")
             return {
                 'metadata': {},
                 'links': [],
@@ -110,9 +120,29 @@ class UniversalExtractor:
             }
         except Exception as e:
             print(f"[EXTRACT] ❌ Parallel extraction failed: {e}")
-            # Fallback to serial extraction
-            print(f"[EXTRACT] Falling back to serial extraction...")
-            return self._extract_serial(tree, url)
+            # Fallback to serial extraction with timeout
+            print(f"[EXTRACT] Falling back to serial extraction with 30s timeout...")
+            try:
+                async with asyncio.timeout(30):
+                    return await asyncio.to_thread(self._extract_serial, tree, url)
+            except asyncio.TimeoutError:
+                print(f"[EXTRACT] ⚠️ Serial extraction timeout - returning empty result")
+                return {
+                    'metadata': {},
+                    'links': [],
+                    'images': [],
+                    'tables': [],
+                    'lists': [],
+                    'forms': [],
+                    'buttons': [],
+                    'cards': [],
+                    'divs': [],
+                    'spans': [],
+                    'headings': [],
+                    'paragraphs': [],
+                    'data_attributes': [],
+                    'summary': {'total_elements': 0}
+                }
     
     def _extract_serial(self, tree, url: str) -> Dict[str, Any]:
         """Fallback serial extraction if parallel fails"""

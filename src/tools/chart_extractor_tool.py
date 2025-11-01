@@ -72,23 +72,78 @@ class ChartExtractorTool(BaseTool):
         Returns:
             ToolResult with extracted records
         """
-        # Run async extraction
+        # Run async extraction with proper error handling
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Try to get existing event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    raise RuntimeError("Event loop is closed")
+            except RuntimeError:
+                # Create new event loop if none exists or closed
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            # Check if loop is already running (nested async context)
+            if loop.is_running():
+                try:
+                    import nest_asyncio # type: ignore
+                    nest_asyncio.apply()
+                    print("[CHART_TOOL] Applied nest_asyncio for nested async context")
+                except ImportError:
+                    print("[CHART_TOOL] nest_asyncio not available, creating new thread")
+                    # Run in a new thread to avoid nested loop issues
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._run_in_new_loop, url, required_fields, page, limit, **kwargs)
+                        return future.result()
+            
+            # Run the async code
+            result = loop.run_until_complete(
+                self._async_execute(url, required_fields, page, limit, **kwargs)
+            )
+            
+            return result
+            
+        except Exception as e:
+            print(f"[CHART_TOOL] Execute error: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return ToolResult(
+                success=False,
+                error=f"Chart extraction failed: {str(e)}"
+            )
+    
+    def _run_in_new_loop(
+        self,
+        url: Optional[str],
+        required_fields: Optional[List[str]],
+        page: Optional[Page],
+        limit: Optional[int],
+        **kwargs
+    ) -> ToolResult:
+        """
+        Run async code in a new event loop (for nested async contexts).
         
-        if loop.is_running():
-            # Already in async context
-            import nest_asyncio # type: ignore
-            nest_asyncio.apply()
-        
-        result = loop.run_until_complete(
-            self._async_execute(url, required_fields, page, limit, **kwargs)
-        )
-        
-        return result
+        Args:
+            url: URL to extract from
+            required_fields: Fields to extract
+            page: Playwright page
+            limit: Max records
+            **kwargs: Additional params
+            
+        Returns:
+            ToolResult
+        """
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        try:
+            return new_loop.run_until_complete(
+                self._async_execute(url, required_fields, page, limit, **kwargs)
+            )
+        finally:
+            new_loop.close()
     
     async def _async_execute(
         self,
@@ -125,18 +180,26 @@ class ChartExtractorTool(BaseTool):
                 try:
                     from src.tools.playwright_universal import UniversalPlaywrightTool
                     
-                    # Try to get the persistent page from global session
-                    persistent_page = UniversalPlaywrightTool._page_instances.get("global")
+                    # Try multiple common session IDs (default, global, session)
+                    session_ids = ["default", "global", "session"]
+                    persistent_page = None
                     
-                    if persistent_page and not persistent_page.is_closed():
-                        print(f"[CHART_TOOL] Using persistent browser from UniversalPlaywrightTool")
+                    for session_id in session_ids:
+                        persistent_page = UniversalPlaywrightTool._page_instances.get(session_id)
+                        if persistent_page:
+                            # Don't call is_closed() - it can block during shutdown
+                            # Just try to use the page and handle errors naturally
+                            print(f"[CHART_TOOL] Using persistent browser from session: {session_id}")
+                            break
+                    
+                    if persistent_page:
                         page = persistent_page
                         
                         # Get URL from page if not provided
                         if not url and hasattr(page, 'url'):
                             url = page.url
                     else:
-                        print(f"[CHART_TOOL] No persistent browser available")
+                        print(f"[CHART_TOOL] No persistent browser available in any session")
                         page = None
                 except Exception as e:
                     print(f"[CHART_TOOL] Failed to get persistent browser: {e}")

@@ -39,6 +39,8 @@ from src.tools.analysis_tools import (
 )
 from src.tools.playwright_universal import UniversalPlaywrightTool
 from src.tools.chart_extractor_tool import ChartExtractorTool
+from src.tools.api_call import APICallTool
+from src.tools.excel_export import ExcelExportTool, CSVExportTool
 
 load_dotenv()
 
@@ -136,6 +138,13 @@ def create_tools_for_session(session_id: str):
     # Initialize Chart Extractor Tool
     chart_extractor_tool = ChartExtractorTool()
     
+    # Initialize API Call Tool
+    api_call_tool = APICallTool()
+    
+    # Initialize Export Tools
+    excel_export_tool = ExcelExportTool(session_id, logger)
+    csv_export_tool = CSVExportTool(session_id, logger)
+    
     # Create list of all tools
     all_tools = [
         # Base tools
@@ -165,7 +174,12 @@ def create_tools_for_session(session_id: str):
         # Universal Playwright Tool (dynamic method execution)
         universal_playwright_tool,
         # Chart Extractor Tool (structured data extraction)
-        chart_extractor_tool
+        chart_extractor_tool,
+        # API Call Tool (HTTP requests for APIs)
+        api_call_tool,
+        # Export Tools (Excel/CSV export)
+        excel_export_tool,
+        csv_export_tool
     ]
     
     # Initialize list_tools meta-tool
@@ -190,38 +204,77 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     Returns:
         str: Agent's response
     """
+    import asyncio
+    import signal
+    
     print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
     print(f"[AgentLogic] Mode: {'Multi-Agent' if USE_MULTI_AGENT_SYSTEM else 'Classic'}")
     
+    # Set up timeout and cancellation handling
+    async def execute_with_timeout():
+        try:
+            # Get the global manager instance
+            manager = get_agent_manager()
+            
+            # Wrap execution in 120 second timeout
+            try:
+                if isinstance(manager, MultiAgentManager):
+                    # Use multi-agent execution
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            manager.execute_task_multi_agent,
+                            prompt=prompt,
+                            message_id=message_id,
+                            session_id=session_id,
+                            use_reason_agent=True
+                        ),
+                        timeout=120.0
+                    )
+                else:
+                    # Use classic execution
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            manager.execute_task,
+                            prompt=prompt,
+                            message_id=message_id,
+                            session_id=session_id
+                        ),
+                        timeout=120.0
+                    )
+                
+                print(f"[AgentLogic] Task completed successfully")
+                return result
+                
+            except asyncio.TimeoutError:
+                error_msg = "Task execution timeout after 120 seconds"
+                logger.error(error_msg, message_id)
+                logger.status(f"❌ {error_msg}")
+                print(f"[AgentLogic] {error_msg}")
+                return f"Error: {error_msg}"
+                
+        except asyncio.CancelledError:
+            print(f"[AgentLogic] Task cancelled")
+            logger.status("❌ Task cancelled by user")
+            raise
+        except Exception as e:
+            error_msg = f"An error occurred during agent execution: {e}"
+            logger.error(error_msg, message_id)
+            print(f"[AgentLogic] Error: {e}")
+            return f"Error: {e}"
+    
+    # Run with asyncio
     try:
-        # Get the global manager instance
-        manager = get_agent_manager()
-        
-        # Execute based on manager type
-        if isinstance(manager, MultiAgentManager):
-            # Use multi-agent execution
-            result = manager.execute_task_multi_agent(
-                prompt=prompt,
-                message_id=message_id,
-                session_id=session_id,
-                use_reason_agent=True  # Enable planning for complex tasks
-            )
-        else:
-            # Use classic execution
-            result = manager.execute_task(
-                prompt=prompt,
-                message_id=message_id,
-                session_id=session_id
-            )
-        
-        print(f"[AgentLogic] Task completed successfully")
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    try:
+        result = loop.run_until_complete(execute_with_timeout())
         return result
-        
-    except Exception as e:
-        error_msg = f"An error occurred during agent execution: {e}"
-        logger.error(error_msg, message_id)
-        print(f"[AgentLogic] Error: {e}")
-        return f"Error: {e}"
+    except KeyboardInterrupt:
+        print(f"[AgentLogic] Interrupted by user")
+        return "Task interrupted by user"
 
 
 # Utility functions for runtime configuration

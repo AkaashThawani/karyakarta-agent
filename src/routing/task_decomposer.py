@@ -29,30 +29,64 @@ class TaskDecomposer:
         self.llm_service = llm_service
         self._registry_text = format_registry_for_llm()
     
-    def decompose(self, task_description: str, task_id: str) -> List[Dict[str, Any]]:
+    def decompose(self, task_description: str, task_id: str, context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Decompose a task into structured subtasks with completeness awareness.
+        Uses pre-analyzed task structure from context when available to avoid extra LLM calls.
         
         Args:
             task_description: User's task description
             task_id: Unique task identifier
+            context: Optional context with query_params, task_type, task_structure, etc.
             
         Returns:
             List of subtask dictionaries with tool, action, parameters
         """
         print(f"[DECOMPOSER] Decomposing task: {task_description}")
         
-        # Extract required fields from task description
-        required_fields = self._extract_required_fields(task_description)
-        if required_fields:
-            print(f"[DECOMPOSER] Detected required fields: {required_fields}")
+        # Extract context if provided
+        query_params = context.get("query_params", {}) if context else {}
+        task_type = context.get("task_type", "general") if context else "general"
+        task_structure = context.get("task_structure", {}) if context else {}
+        required_fields = context.get("required_fields", []) if context else []
+        
+        if query_params:
+            print(f"[DECOMPOSER] Using query params from context: {query_params}")
+        if task_type != "general":
+            print(f"[DECOMPOSER] Task type from context: {task_type}")
+        if task_structure and task_structure.get("type") != "single":
+            print(f"[DECOMPOSER] Using pre-analyzed task structure: {task_structure.get('type')}")
+        
+        # Check if we have pre-analyzed sequential steps (saves LLM call!)
+        if task_structure.get("type") == "sequential" and task_structure.get("steps"):
+            print(f"[DECOMPOSER] ⚡ Using pre-analyzed sequential steps (no LLM call)")
+            
+            # DEBUG LOGGING
+            print(f"[DECOMPOSER] 🔍 DEBUG: task_structure = {task_structure}")
+            print(f"[DECOMPOSER] 🔍 DEBUG: steps = {task_structure.get('steps')}")
+            print(f"[DECOMPOSER] 🔍 DEBUG: steps type = {type(task_structure.get('steps'))}")
+            print(f"[DECOMPOSER] 🔍 DEBUG: steps length = {len(task_structure.get('steps', []))}")
+            
+            return self._create_sequential_subtasks(
+                task_structure.get("steps", []),
+                task_id,
+                query_params,
+                required_fields,
+                task_description  # Pass original description!
+            )
+        
+        # Extract required fields from task description if not provided
+        if not required_fields:
+            required_fields = self._extract_required_fields(task_description)
+            if required_fields:
+                print(f"[DECOMPOSER] Detected required fields: {required_fields}")
         
         if not self.llm_service:
             print("[DECOMPOSER] No LLM service, using keyword fallback")
-            return self._fallback_decomposition(task_description, task_id)
+            return self._fallback_decomposition(task_description, task_id, query_params, task_type)
         
         try:
-            subtasks = self._llm_decomposition(task_description, task_id)
+            subtasks = self._llm_decomposition(task_description, task_id, query_params, task_type)
             
             if subtasks:
                 print(f"[DECOMPOSER] LLM generated {len(subtasks)} subtasks")
@@ -61,16 +95,20 @@ class TaskDecomposer:
                 if required_fields:
                     subtasks = self._add_completeness_checks(subtasks, required_fields, task_id)
                 
+                # NEW: Apply query params to subtasks if api_call tool is used
+                if query_params:
+                    subtasks = self._apply_query_params(subtasks, query_params)
+                
                 return subtasks
             else:
                 print("[DECOMPOSER] LLM returned empty, using fallback")
-                return self._fallback_decomposition(task_description, task_id)
+                return self._fallback_decomposition(task_description, task_id, query_params, task_type)
                 
         except Exception as e:
             print(f"[DECOMPOSER] LLM decomposition failed: {e}, using fallback")
-            return self._fallback_decomposition(task_description, task_id)
+            return self._fallback_decomposition(task_description, task_id, query_params, task_type)
     
-    def _llm_decomposition(self, task_description: str, task_id: str) -> List[Dict[str, Any]]:
+    def _llm_decomposition(self, task_description: str, task_id: str, query_params: Dict[str, Any], task_type: str) -> List[Dict[str, Any]]:
         """
         Use LLM to decompose task into subtasks.
         
@@ -359,7 +397,214 @@ Return ONLY the JSON array (no markdown, no explanation):"""
         
         return True
     
-    def _fallback_decomposition(self, task_description: str, task_id: str) -> List[Dict[str, Any]]:
+    def _create_sequential_subtasks(
+        self,
+        steps: List,
+        task_id: str,
+        query_params: Dict[str, Any],
+        required_fields: List[str],
+        original_description: str = ""
+    ) -> List[Dict[str, Any]]:
+        """
+        Create subtasks from pre-analyzed sequential steps with tool assignments.
+        Steps are expected to be objects with "description" and "tool" fields.
+        Intelligently maps step descriptions to proper tool parameters.
+        
+        Args:
+            steps: List of step objects from comprehensive analysis
+            task_id: Task identifier
+            query_params: Query parameters to apply
+            required_fields: Fields to extract
+            original_description: Original user task description (for URL extraction)
+            
+        Returns:
+            List of subtask dictionaries
+        """
+        print(f"[DECOMPOSER] Creating {len(steps)} sequential subtasks with tool assignments")
+        
+        subtasks = []
+        
+        for i, step in enumerate(steps):
+            # Expect step to be a dict with "description", "tool", and optionally "parameters"
+            if isinstance(step, dict):
+                step_desc = step.get("description", str(step))
+                tool = step.get("tool", "google_search")
+                print(f"[DECOMPOSER] Step {i+1}: {step_desc[:50]}... → {tool}")
+                
+                # NEW: Use LLM-provided parameters if available!
+                if "parameters" in step and step["parameters"]:
+                    parameters = step["parameters"]
+                    print(f"[DECOMPOSER] ✓ Using LLM-provided parameters: {parameters}")
+                else:
+                    # Fallback: generate parameters
+                    print(f"[DECOMPOSER] No parameters in step, generating...")
+                    parameters = self._map_parameters_for_tool(
+                        tool, 
+                        step_desc, 
+                        query_params, 
+                        required_fields,
+                        original_description
+                    )
+            else:
+                # Fallback for unexpected format
+                step_desc = str(step)
+                tool = "google_search"
+                print(f"[DECOMPOSER] ⚠️ Step {i+1}: Unexpected format, using fallback → {tool}")
+                parameters = self._map_parameters_for_tool(
+                    tool, 
+                    step_desc, 
+                    query_params, 
+                    required_fields,
+                    original_description
+                )
+            
+            subtask = {
+                "subtask_id": f"{task_id}_seq_{i}",
+                "tool": tool,
+                "parameters": parameters,
+                "description": step_desc
+            }
+            
+            # Add dependency if not first step
+            if i > 0:
+                subtask["depends_on"] = f"{task_id}_seq_{i-1}"
+            
+            subtasks.append(subtask)
+        
+        print(f"[DECOMPOSER] ✓ Created {len(subtasks)} subtasks with tool assignments")
+        return subtasks
+    
+    def _map_parameters_for_tool(
+        self,
+        tool: str,
+        step_desc: str,
+        query_params: Dict[str, Any],
+        required_fields: List[str],
+        original_description: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Map step description to proper tool parameters.
+        
+        Args:
+            tool: Tool name
+            step_desc: Step description
+            query_params: Query parameters from analysis
+            required_fields: Required fields from analysis
+            original_description: Original user task description (for URL extraction)
+            
+        Returns:
+            Tool-specific parameters dict
+        """
+        if tool == "playwright_execute":
+            # Extract URL from step description first
+            import re
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            url_match = re.search(url_pattern, step_desc)
+            
+            if url_match:
+                url = url_match.group(0).rstrip(',.;:!?')
+                print(f"[DECOMPOSER] ✓ Found URL in step: {url}")
+                return {
+                    "url": url,
+                    "method": "goto"
+                }
+            
+            # If not found in step, try original description
+            if original_description:
+                url_match = re.search(url_pattern, original_description)
+                if url_match:
+                    url = url_match.group(0).rstrip(',.;:!?')
+                    print(f"[DECOMPOSER] ✓ Found URL in original description: {url}")
+                    return {
+                        "url": url,
+                        "method": "goto"
+                    }
+            
+            # No URL found anywhere
+            print(f"[DECOMPOSER] ⚠️ No URL found for playwright_execute step")
+            return {"query": step_desc}
+        
+        elif tool == "chart_extractor":
+            # Use required fields and limit from analysis
+            params = {}
+            
+            if required_fields:
+                params["required_fields"] = required_fields
+            
+            if query_params.get("limit"):
+                params["limit"] = query_params["limit"]
+            
+            # If no specific params, at least pass the description
+            if not params:
+                params["query"] = step_desc
+            
+            return params
+        
+        elif tool == "google_search":
+            # Search just needs the query
+            return {"query": step_desc}
+        
+        elif tool == "api_call":
+            # Extract URL and method if present
+            import re
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            url_match = re.search(url_pattern, step_desc)
+            
+            params = {
+                "method": "GET",
+                "params": query_params
+            }
+            
+            if url_match:
+                params["url"] = url_match.group(0).rstrip(',.;:!?')
+            
+            return params
+        
+        else:
+            # Default: pass as query
+            return {"query": step_desc}
+    
+    def _apply_query_params(self, subtasks: List[Dict[str, Any]], query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Apply query parameters to subtasks that use api_call or need params.
+        
+        Args:
+            subtasks: List of subtasks
+            query_params: Query parameters to apply
+            
+        Returns:
+            Updated subtasks with query params
+        """
+        for subtask in subtasks:
+            tool = subtask.get("tool")
+            
+            # Apply to api_call tool
+            if tool == "api_call":
+                if "parameters" not in subtask:
+                    subtask["parameters"] = {}
+                if "params" not in subtask["parameters"]:
+                    subtask["parameters"]["params"] = query_params
+                    print(f"[DECOMPOSER] Applied query params to api_call: {query_params}")
+            
+            # Apply to playwright_execute for API URLs
+            elif tool == "playwright_execute":
+                params = subtask.get("parameters", {})
+                url = params.get("url", "")
+                
+                # If URL looks like an API endpoint, add query params
+                if "api" in url.lower() or "/posts" in url or "/users" in url:
+                    # Build query string
+                    if query_params:
+                        query_str = "&".join([f"{k}={v}" for k, v in query_params.items()])
+                        if "?" in url:
+                            params["url"] = f"{url}&{query_str}"
+                        else:
+                            params["url"] = f"{url}?{query_str}"
+                        print(f"[DECOMPOSER] Applied query params to URL: {params['url']}")
+        
+        return subtasks
+    
+    def _fallback_decomposition(self, task_description: str, task_id: str, query_params: Dict[str, Any] = {}, task_type: str = "general") -> List[Dict[str, Any]]:
         """
         Fallback decomposition using keyword matching.
         
@@ -404,7 +649,7 @@ Return ONLY the JSON array (no markdown, no explanation):"""
         browser_keywords = ["go to", "navigate", "visit", "click", "fill", "search", "submit"]
         
         if any(keyword in description_lower for keyword in browser_keywords):
-            # Extract URL if present
+            # Extract URL if present (full URL with domain)
             url_pattern = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?'
             url_match = re.search(url_pattern, task_description)
             
@@ -429,6 +674,31 @@ Return ONLY the JSON array (no markdown, no explanation):"""
                     "description": f"Navigate to {url}"
                 })
                 counter += 1
+            else:
+                # Try to extract website name (e.g., "go to eventbrite")
+                website_pattern = r'(?:go\s+to|navigate\s+to|visit)\s+([a-zA-Z0-9]+)(?:\s|$|,)'
+                website_match = re.search(website_pattern, description_lower)
+                
+                if website_match:
+                    website_name = website_match.group(1).strip()
+                    # Common website names to full domains
+                    url = f'https://www.{website_name}.com'
+                    
+                    print(f"[DECOMPOSER] Extracted website name '{website_name}', constructed URL: {url}")
+                    
+                    # Add navigation subtask
+                    subtasks.append({
+                        "subtask_id": f"{task_id}_sub_{counter}",
+                        "tool": "playwright_execute",
+                        "action": "goto",
+                        "parameters": {
+                            "url": url,
+                            "method": "goto",
+                            "args": {}
+                        },
+                        "description": f"Navigate to {url}"
+                    })
+                    counter += 1
             
             # Check for search action
             if "search" in description_lower:
