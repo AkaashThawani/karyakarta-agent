@@ -1,0 +1,361 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tool I/O Schema",
+  "description": "Declarative specifications for all tool inputs and outputs with automatic data flow mapping",
+  "version": "1.0.0",
+  
+  "google_search": {
+    "metadata": {
+      "category": "search",
+      "description": "Search Google for information",
+      "version": "1.0.0",
+      "supports_dynamic_outputs": true
+    },
+    "inputs": {
+      "query": {
+        "type": "string",
+        "required": true,
+        "description": "Search query text",
+        "validation": {
+          "min_length": 1,
+          "max_length": 500
+        },
+        "examples": ["Python tutorials", "weather in Seattle", "restaurants near me"]
+      }
+    },
+    "outputs": {
+      "text": {
+        "type": "string",
+        "description": "Full search results text with URLs and snippets",
+        "extractor": "identity"
+      },
+      "urls": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Extracted URLs from search results",
+        "extractor": "extract_urls_from_text"
+      },
+      "snippets": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Search result text snippets",
+        "extractor": "extract_snippets_from_text"
+      }
+    }
+  },
+  
+  "chart_extractor": {
+    "metadata": {
+      "category": "extraction",
+      "description": "Extract structured data (tables, lists, charts) from webpages",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "URL to extract data from",
+        "accepts_from": [
+          "google_search.urls[0]",
+          "playwright_execute.current_url"
+        ],
+        "validation": {
+          "pattern": "^https?://.+"
+        },
+        "examples": ["https://news.ycombinator.com", "https://example.com/data"]
+      },
+      "required_fields": {
+        "type": "array",
+        "items": {"type": "string"},
+        "required": true,
+        "description": "Field names to extract from the page",
+        "examples": [["title", "url", "points"], ["name", "price", "rating"]]
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "default": 10,
+        "description": "Maximum number of records to extract",
+        "validation": {
+          "min": 1,
+          "max": 100
+        }
+      }
+    },
+    "outputs": {
+      "records": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Array of extracted structured records",
+        "extractor": "identity"
+      },
+      "count": {
+        "type": "integer",
+        "description": "Number of records successfully extracted",
+        "extractor": "count_records"
+      },
+      "fields": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of field names in extracted records",
+        "extractor": "extract_field_names"
+      }
+    }
+  },
+  
+  "playwright_execute": {
+    "metadata": {
+      "category": "browser_automation",
+      "description": "Execute browser actions using Playwright",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": false,
+        "description": "URL to navigate to (required for goto method)",
+        "accepts_from": ["google_search.urls[0]"],
+        "validation": {
+          "pattern": "^https?://.+"
+        }
+      },
+      "method": {
+        "type": "string",
+        "required": true,
+        "description": "Playwright method to execute",
+        "enum": ["goto", "click", "fill", "press", "text_content", "wait_for_timeout", "screenshot"],
+        "examples": ["goto", "click", "fill"]
+      },
+      "selector": {
+        "type": "string",
+        "required": false,
+        "description": "CSS selector for element (required for click, fill, press, text_content)",
+        "examples": ["input[name='search']", "button.submit", "#login-button"]
+      },
+      "selector_hint": {
+        "type": "string",
+        "required": false,
+        "description": "Semantic selector hint for common elements",
+        "enum": ["search_input", "login_button", "submit_button", "email_field", "password_field"],
+        "note": "Preferred over raw selector when available"
+      },
+      "args": {
+        "type": "object",
+        "required": false,
+        "default": {},
+        "description": "Method-specific arguments",
+        "examples": [{"value": "search text"}, {"key": "Enter"}, {"timeout": 3000}]
+      }
+    },
+    "outputs": {
+      "current_url": {
+        "type": "string",
+        "description": "Current page URL after action",
+        "extractor": "get_current_url"
+      },
+      "text_content": {
+        "type": "string",
+        "description": "Extracted text content (for text_content method)",
+        "extractor": "identity"
+      },
+      "screenshot": {
+        "type": "string",
+        "description": "Base64 encoded screenshot (for screenshot method)",
+        "extractor": "identity"
+      }
+    }
+  },
+  
+  "scraper": {
+    "metadata": {
+      "category": "extraction",
+      "description": "Basic web scraping tool",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "URL to scrape",
+        "accepts_from": ["google_search.urls[0]"],
+        "validation": {
+          "pattern": "^https?://.+"
+        }
+      }
+    },
+    "outputs": {
+      "html": {
+        "type": "string",
+        "description": "Raw HTML content",
+        "extractor": "identity"
+      },
+      "text": {
+        "type": "string",
+        "description": "Extracted text content",
+        "extractor": "extract_text_from_html"
+      },
+      "links": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "All links found on page",
+        "extractor": "extract_links_from_html"
+      }
+    }
+  },
+  
+  "api_call": {
+    "metadata": {
+      "category": "api",
+      "description": "Make HTTP API requests",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "API endpoint URL",
+        "validation": {
+          "pattern": "^https?://.+"
+        }
+      },
+      "method": {
+        "type": "string",
+        "required": false,
+        "default": "GET",
+        "description": "HTTP method",
+        "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+      },
+      "params": {
+        "type": "object",
+        "required": false,
+        "default": {},
+        "description": "Query parameters"
+      },
+      "headers": {
+        "type": "object",
+        "required": false,
+        "default": {},
+        "description": "HTTP headers"
+      },
+      "body": {
+        "type": "object",
+        "required": false,
+        "description": "Request body (for POST/PUT/PATCH)"
+      }
+    },
+    "outputs": {
+      "data": {
+        "type": "any",
+        "description": "Response data (parsed JSON if applicable)",
+        "extractor": "identity"
+      },
+      "status_code": {
+        "type": "integer",
+        "description": "HTTP status code",
+        "extractor": "extract_status_code"
+      },
+      "headers": {
+        "type": "object",
+        "description": "Response headers",
+        "extractor": "extract_response_headers"
+      }
+    }
+  },
+  
+  "calculator": {
+    "metadata": {
+      "category": "utility",
+      "description": "Perform mathematical calculations",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "expression": {
+        "type": "string",
+        "required": true,
+        "description": "Mathematical expression to evaluate",
+        "examples": ["2 + 2", "sqrt(16)", "10 * 5 + 3"]
+      }
+    },
+    "outputs": {
+      "result": {
+        "type": "number",
+        "description": "Calculation result",
+        "extractor": "identity"
+      }
+    }
+  },
+  
+  "excel_export": {
+    "metadata": {
+      "category": "export",
+      "description": "Export data to Excel file",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "data": {
+        "type": "array",
+        "items": {"type": "object"},
+        "required": true,
+        "description": "Array of records to export",
+        "accepts_from": ["chart_extractor.records"]
+      },
+      "filename": {
+        "type": "string",
+        "required": true,
+        "description": "Output filename (without extension)"
+      },
+      "sheet_name": {
+        "type": "string",
+        "required": false,
+        "default": "Sheet1",
+        "description": "Excel sheet name"
+      }
+    },
+    "outputs": {
+      "file_path": {
+        "type": "string",
+        "description": "Path to created Excel file",
+        "extractor": "extract_file_path"
+      },
+      "row_count": {
+        "type": "integer",
+        "description": "Number of rows exported",
+        "extractor": "count_records"
+      }
+    }
+  },
+  
+  "csv_export": {
+    "metadata": {
+      "category": "export",
+      "description": "Export data to CSV file",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "data": {
+        "type": "array",
+        "items": {"type": "object"},
+        "required": true,
+        "description": "Array of records to export",
+        "accepts_from": ["chart_extractor.records"]
+      },
+      "filename": {
+        "type": "string",
+        "required": true,
+        "description": "Output filename (without extension)"
+      }
+    },
+    "outputs": {
+      "file_path": {
+        "type": "string",
+        "description": "Path to created CSV file",
+        "extractor": "extract_file_path"
+      },
+      "row_count": {
+        "type": "integer",
+        "description": "Number of rows exported",
+        "extractor": "count_records"
+      }
+    }
+  }
+}

@@ -148,7 +148,7 @@ class BrowseWithFormTool(BaseTool):
             
             try:
                 page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle")
+                await page.goto(url, wait_until="domcontentloaded")
                 
                 # Fill form fields
                 for field_name, value in form_data.items():
@@ -281,7 +281,7 @@ class BrowseWithAuthTool(BaseTool):
             
             try:
                 page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle")
+                await page.goto(url, wait_until="domcontentloaded")
                 
                 # Fill login form
                 await page.fill(username_selector, username)
@@ -397,7 +397,7 @@ class BrowseMultiPageTool(BaseTool):
                 
                 current_url = start_url
                 for page_num in range(max_pages):
-                    await page.goto(current_url, wait_until="networkidle")
+                    await page.goto(current_url, wait_until="domcontentloaded")
                     await page.wait_for_timeout(wait_between * 1000)
                     
                     content = await page.content()

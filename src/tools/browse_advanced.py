@@ -193,7 +193,7 @@ class BrowseAndWaitTool(BaseTool):
                 page = await browser.new_page()
                 
                 # Navigate to URL
-                await page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
                 
                 # Wait for specific selector if provided
                 if wait_selector:
@@ -295,7 +295,7 @@ class BrowseWithScrollTool(BaseTool):
             
             try:
                 page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle")
+                await page.goto(url, wait_until="domcontentloaded")
                 
                 # Scroll multiple times
                 for i in range(scroll_times):
@@ -397,7 +397,7 @@ class BrowseWithClickTool(BaseTool):
             
             try:
                 page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle")
+                await page.goto(url, wait_until="domcontentloaded")
                 
                 # Click element
                 await page.click(click_selector)

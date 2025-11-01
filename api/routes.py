@@ -15,7 +15,8 @@ Usage:
 """
 
 from fastapi import APIRouter, BackgroundTasks
-from agent_logic import run_agent_task
+from pydantic import BaseModel
+from agent_logic import run_agent_task, cancel_task
 from src.models.message import TaskRequest, TaskResponse
 
 # Create router for all agent routes
@@ -86,3 +87,27 @@ async def execute_task(request: TaskRequest, background_tasks: BackgroundTasks):
         sessionId=request.sessionId or "default",
         message="Agent task has been initiated in the background."
     )
+
+
+class CancelRequest(BaseModel):
+    """Request model for task cancellation."""
+    messageId: str
+
+
+@router.post("/cancel-task")
+async def cancel_agent_task(request: CancelRequest):
+    """
+    Cancel a running agent task.
+    
+    Args:
+        request: CancelRequest with messageId
+        
+    Returns:
+        Cancellation status response
+    """
+    print(f"[API] Received cancellation request for message: {request.messageId}")
+    
+    # Call the cancel_task function from agent_logic
+    result = cancel_task(request.messageId)
+    
+    return result

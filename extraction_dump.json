@@ -1,17 +1,779 @@
 {
   "metadata": {
-    "url": "https://www.eventbrite.com/d/wa--everett/free-events/",
-    "title": "\n    Discover Free Events & Activities in Everett, WA | Eventbrite\n",
+    "url": "https://news.ycombinator.com/",
+    "title": "Hacker News",
     "description": "",
     "keywords": ""
   },
+  "tables": [
+    {
+      "table_id": 0,
+      "headers": [],
+      "rows": [
+        {
+          "col_0": "Hacker Newsnew|past|comments|ask|show|jobs|submitlogin",
+          "col_1": "",
+          "col_2": "Hacker Newsnew|past|comments|ask|show|jobs|submit",
+          "col_3": "login"
+        },
+        {
+          "col_0": "",
+          "col_1": "Hacker Newsnew|past|comments|ask|show|jobs|submit",
+          "col_2": "login"
+        },
+        {
+          "col_0": "1.Updated practice for review articles and position papers in ArXiv CS category(arxiv.org)367 pointsbydw646 hours ago|hide|161 comments2.GHC now runs in the browser(haskell.org)180 pointsbykaycebasques5 hours ago|hide|54 comments3.Claude Code Can Debug Low-Level Cryptography(filippo.io)59 pointsbyBogdanp2 hours ago|hide|20 comments4.Beginner-friendly, unofficial documentation for Helix text editor(helix-editor.vercel.app)39 pointsbyCuriositry1 hour ago|hide|8 comments5.Show HN: Why write code if the LLM can just do the thing? (web app experiment)(github.com/samrolken)131 pointsbysamrolken3 hours ago|hide|118 comments6.Dating: A Mysterious Constellation of Facts(dynomight.net)27 pointsbytobr2 hours ago|hide|19 comments7.SQLite concurrency and why you should care about it(jellyfin.org)213 pointsbyHunOL8 hours ago|hide|96 comments8.Austria: Pylons as sculpture for public acceptance of expanding electrification(goodgoodgood.co)65 pointsbyGeekette4 hours ago|hide|32 comments9.Word2vec-style vector arithmetic on docs embeddings(technicalwriting.dev)22 pointsbykaycebasques2 hours ago|hide|2 comments10.Chat Control proposal fails again after public opposition(andreafortuna.org)342 pointsbyspeckx4 hours ago|hide|100 comments11.The hardest program I've ever written (2015)(stuffwithstuff.com)25 pointsbyjacobedawson3 hours ago|hide|9 comments12.From 400 Mbps to 1.7 Gbps: A WiFi 7 Debugging Journey(tymscar.com)10 pointsbytymscar1 hour ago|hide|2 comments13.The Smol Training Playbook: The Secrets to Building World-Class LLMs(huggingface.co)52 pointsbykashifr5 hours ago|hide|3 comments14.CharlotteOS – An Experimental Modern Operating System(github.com/charlotte-os)127 pointsbyementally8 hours ago|hide|54 comments15.Visible from space, Sudan's bloodied sands expose a massacre of thousands(telegraph.co.uk)167 pointsbywslh3 hours ago|hide|51 comments16.Open-Source Ada: From Gateware to Application(adacore.com)42 pointsbyBogdanp6 hours ago|hide|7 comments17.Ask HN: Where to begin with \"modern\" Emacs?58 pointsbyweakfish4 hours ago|hide|46 comments18.Reconfigurable Analog Computers(arxiv.org)13 pointsbygidellav3 hours ago|hide|4 comments19.Hard Rust requirements from May onward(debian.org)280 pointsbyrkta13 hours ago|hide|470 comments20.I built my own CityMapper(asherfalcon.com)84 pointsbyashfn8 hours ago|hide|11 comments21.'Chinese lantern' structure shifts into many shapes for various applications(techxplore.com)10 pointsbyPaulHoule1 hour ago|hide|discuss22.Studies increasingly find links between air pollutants and dementia(nytimes.com)98 pointsbyquapster4 hours ago|hide|73 comments23.NJVL: Nim's New Intermediate Representation(github.com/nim-lang)37 pointsbygenerichuman7 hours ago|hide|1 comment24.Czech police forced to turn off facial recognition cameras at the Prague airport(edri.org)51 pointsbycampuscodi2 hours ago|hide|5 comments25.Self-help gets philosophical(thedriftmag.com)69 pointsbyXzetaU84 hours ago|hide|70 comments26.Frank Gasking on preserving «lost» games(spillhistorie.no)64 pointsbydoener9 hours ago|hide|13 comments27.Data centers contribute to high prices as energy bills electrify local politics(wsj.com)71 pointsbymoose_man5 hours ago|hide|38 comments28.How I stopped worrying and started loving the Assembly(medium.com/jonas.eschenburg)166 pointsbyindyjo17 hours ago|hide|28 comments29.FFmpeg Dealing with a Security Researcher(twitter.com/ffmpeg)4 pointsbytrollied30 minutes ago|hide|discuss30.S.A.R.C.A.S.M: Slightly Annoying Rubik's Cube Automatic Solving Machine(github.com/vindar)256 pointsbychris_overseas22 hours ago|hide|54 commentsMore",
+          "col_1": "1.",
+          "col_2": "",
+          "col_3": "Updated practice for review articles and position papers in ArXiv CS category(arxiv.org)",
+          "col_4": "",
+          "col_5": "367 pointsbydw646 hours ago|hide|161 comments",
+          "col_6": "2.",
+          "col_7": "",
+          "col_8": "GHC now runs in the browser(haskell.org)",
+          "col_9": "",
+          "col_10": "180 pointsbykaycebasques5 hours ago|hide|54 comments",
+          "col_11": "3.",
+          "col_12": "",
+          "col_13": "Claude Code Can Debug Low-Level Cryptography(filippo.io)",
+          "col_14": "",
+          "col_15": "59 pointsbyBogdanp2 hours ago|hide|20 comments",
+          "col_16": "4.",
+          "col_17": "",
+          "col_18": "Beginner-friendly, unofficial documentation for Helix text editor(helix-editor.vercel.app)",
+          "col_19": "",
+          "col_20": "39 pointsbyCuriositry1 hour ago|hide|8 comments",
+          "col_21": "5.",
+          "col_22": "",
+          "col_23": "Show HN: Why write code if the LLM can just do the thing? (web app experiment)(github.com/samrolken)",
+          "col_24": "",
+          "col_25": "131 pointsbysamrolken3 hours ago|hide|118 comments",
+          "col_26": "6.",
+          "col_27": "",
+          "col_28": "Dating: A Mysterious Constellation of Facts(dynomight.net)",
+          "col_29": "",
+          "col_30": "27 pointsbytobr2 hours ago|hide|19 comments",
+          "col_31": "7.",
+          "col_32": "",
+          "col_33": "SQLite concurrency and why you should care about it(jellyfin.org)",
+          "col_34": "",
+          "col_35": "213 pointsbyHunOL8 hours ago|hide|96 comments",
+          "col_36": "8.",
+          "col_37": "",
+          "col_38": "Austria: Pylons as sculpture for public acceptance of expanding electrification(goodgoodgood.co)",
+          "col_39": "",
+          "col_40": "65 pointsbyGeekette4 hours ago|hide|32 comments",
+          "col_41": "9.",
+          "col_42": "",
+          "col_43": "Word2vec-style vector arithmetic on docs embeddings(technicalwriting.dev)",
+          "col_44": "",
+          "col_45": "22 pointsbykaycebasques2 hours ago|hide|2 comments",
+          "col_46": "10.",
+          "col_47": "",
+          "col_48": "Chat Control proposal fails again after public opposition(andreafortuna.org)",
+          "col_49": "",
+          "col_50": "342 pointsbyspeckx4 hours ago|hide|100 comments",
+          "col_51": "11.",
+          "col_52": "",
+          "col_53": "The hardest program I've ever written (2015)(stuffwithstuff.com)",
+          "col_54": "",
+          "col_55": "25 pointsbyjacobedawson3 hours ago|hide|9 comments",
+          "col_56": "12.",
+          "col_57": "",
+          "col_58": "From 400 Mbps to 1.7 Gbps: A WiFi 7 Debugging Journey(tymscar.com)",
+          "col_59": "",
+          "col_60": "10 pointsbytymscar1 hour ago|hide|2 comments",
+          "col_61": "13.",
+          "col_62": "",
+          "col_63": "The Smol Training Playbook: The Secrets to Building World-Class LLMs(huggingface.co)",
+          "col_64": "",
+          "col_65": "52 pointsbykashifr5 hours ago|hide|3 comments",
+          "col_66": "14.",
+          "col_67": "",
+          "col_68": "CharlotteOS – An Experimental Modern Operating System(github.com/charlotte-os)",
+          "col_69": "",
+          "col_70": "127 pointsbyementally8 hours ago|hide|54 comments",
+          "col_71": "15.",
+          "col_72": "",
+          "col_73": "Visible from space, Sudan's bloodied sands expose a massacre of thousands(telegraph.co.uk)",
+          "col_74": "",
+          "col_75": "167 pointsbywslh3 hours ago|hide|51 comments",
+          "col_76": "16.",
+          "col_77": "",
+          "col_78": "Open-Source Ada: From Gateware to Application(adacore.com)",
+          "col_79": "",
+          "col_80": "42 pointsbyBogdanp6 hours ago|hide|7 comments",
+          "col_81": "17.",
+          "col_82": "",
+          "col_83": "Ask HN: Where to begin with \"modern\" Emacs?",
+          "col_84": "",
+          "col_85": "58 pointsbyweakfish4 hours ago|hide|46 comments",
+          "col_86": "18.",
+          "col_87": "",
+          "col_88": "Reconfigurable Analog Computers(arxiv.org)",
+          "col_89": "",
+          "col_90": "13 pointsbygidellav3 hours ago|hide|4 comments",
+          "col_91": "19.",
+          "col_92": "",
+          "col_93": "Hard Rust requirements from May onward(debian.org)",
+          "col_94": "",
+          "col_95": "280 pointsbyrkta13 hours ago|hide|470 comments",
+          "col_96": "20.",
+          "col_97": "",
+          "col_98": "I built my own CityMapper(asherfalcon.com)",
+          "col_99": "",
+          "col_100": "84 pointsbyashfn8 hours ago|hide|11 comments",
+          "col_101": "21.",
+          "col_102": "",
+          "col_103": "'Chinese lantern' structure shifts into many shapes for various applications(techxplore.com)",
+          "col_104": "",
+          "col_105": "10 pointsbyPaulHoule1 hour ago|hide|discuss",
+          "col_106": "22.",
+          "col_107": "",
+          "col_108": "Studies increasingly find links between air pollutants and dementia(nytimes.com)",
+          "col_109": "",
+          "col_110": "98 pointsbyquapster4 hours ago|hide|73 comments",
+          "col_111": "23.",
+          "col_112": "",
+          "col_113": "NJVL: Nim's New Intermediate Representation(github.com/nim-lang)",
+          "col_114": "",
+          "col_115": "37 pointsbygenerichuman7 hours ago|hide|1 comment",
+          "col_116": "24.",
+          "col_117": "",
+          "col_118": "Czech police forced to turn off facial recognition cameras at the Prague airport(edri.org)",
+          "col_119": "",
+          "col_120": "51 pointsbycampuscodi2 hours ago|hide|5 comments",
+          "col_121": "25.",
+          "col_122": "",
+          "col_123": "Self-help gets philosophical(thedriftmag.com)",
+          "col_124": "",
+          "col_125": "69 pointsbyXzetaU84 hours ago|hide|70 comments",
+          "col_126": "26.",
+          "col_127": "",
+          "col_128": "Frank Gasking on preserving «lost» games(spillhistorie.no)",
+          "col_129": "",
+          "col_130": "64 pointsbydoener9 hours ago|hide|13 comments",
+          "col_131": "27.",
+          "col_132": "",
+          "col_133": "Data centers contribute to high prices as energy bills electrify local politics(wsj.com)",
+          "col_134": "",
+          "col_135": "71 pointsbymoose_man5 hours ago|hide|38 comments",
+          "col_136": "28.",
+          "col_137": "",
+          "col_138": "How I stopped worrying and started loving the Assembly(medium.com/jonas.eschenburg)",
+          "col_139": "",
+          "col_140": "166 pointsbyindyjo17 hours ago|hide|28 comments",
+          "col_141": "29.",
+          "col_142": "",
+          "col_143": "FFmpeg Dealing with a Security Researcher(twitter.com/ffmpeg)",
+          "col_144": "",
+          "col_145": "4 pointsbytrollied30 minutes ago|hide|discuss",
+          "col_146": "30.",
+          "col_147": "",
+          "col_148": "S.A.R.C.A.S.M: Slightly Annoying Rubik's Cube Automatic Solving Machine(github.com/vindar)",
+          "col_149": "",
+          "col_150": "256 pointsbychris_overseas22 hours ago|hide|54 comments",
+          "col_151": "",
+          "col_152": "More"
+        },
+        {
+          "col_0": "1.",
+          "col_1": "",
+          "col_2": "Updated practice for review articles and position papers in ArXiv CS category(arxiv.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "367 pointsbydw646 hours ago|hide|161 comments"
+        },
+        {
+          "col_0": "2.",
+          "col_1": "",
+          "col_2": "GHC now runs in the browser(haskell.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "180 pointsbykaycebasques5 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "3.",
+          "col_1": "",
+          "col_2": "Claude Code Can Debug Low-Level Cryptography(filippo.io)"
+        },
+        {
+          "col_0": "",
+          "col_1": "59 pointsbyBogdanp2 hours ago|hide|20 comments"
+        },
+        {
+          "col_0": "4.",
+          "col_1": "",
+          "col_2": "Beginner-friendly, unofficial documentation for Helix text editor(helix-editor.vercel.app)"
+        },
+        {
+          "col_0": "",
+          "col_1": "39 pointsbyCuriositry1 hour ago|hide|8 comments"
+        },
+        {
+          "col_0": "5.",
+          "col_1": "",
+          "col_2": "Show HN: Why write code if the LLM can just do the thing? (web app experiment)(github.com/samrolken)"
+        },
+        {
+          "col_0": "",
+          "col_1": "131 pointsbysamrolken3 hours ago|hide|118 comments"
+        },
+        {
+          "col_0": "6.",
+          "col_1": "",
+          "col_2": "Dating: A Mysterious Constellation of Facts(dynomight.net)"
+        },
+        {
+          "col_0": "",
+          "col_1": "27 pointsbytobr2 hours ago|hide|19 comments"
+        },
+        {
+          "col_0": "7.",
+          "col_1": "",
+          "col_2": "SQLite concurrency and why you should care about it(jellyfin.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "213 pointsbyHunOL8 hours ago|hide|96 comments"
+        },
+        {
+          "col_0": "8.",
+          "col_1": "",
+          "col_2": "Austria: Pylons as sculpture for public acceptance of expanding electrification(goodgoodgood.co)"
+        },
+        {
+          "col_0": "",
+          "col_1": "65 pointsbyGeekette4 hours ago|hide|32 comments"
+        },
+        {
+          "col_0": "9.",
+          "col_1": "",
+          "col_2": "Word2vec-style vector arithmetic on docs embeddings(technicalwriting.dev)"
+        },
+        {
+          "col_0": "",
+          "col_1": "22 pointsbykaycebasques2 hours ago|hide|2 comments"
+        },
+        {
+          "col_0": "10.",
+          "col_1": "",
+          "col_2": "Chat Control proposal fails again after public opposition(andreafortuna.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "342 pointsbyspeckx4 hours ago|hide|100 comments"
+        },
+        {
+          "col_0": "11.",
+          "col_1": "",
+          "col_2": "The hardest program I've ever written (2015)(stuffwithstuff.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "25 pointsbyjacobedawson3 hours ago|hide|9 comments"
+        },
+        {
+          "col_0": "12.",
+          "col_1": "",
+          "col_2": "From 400 Mbps to 1.7 Gbps: A WiFi 7 Debugging Journey(tymscar.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "10 pointsbytymscar1 hour ago|hide|2 comments"
+        },
+        {
+          "col_0": "13.",
+          "col_1": "",
+          "col_2": "The Smol Training Playbook: The Secrets to Building World-Class LLMs(huggingface.co)"
+        },
+        {
+          "col_0": "",
+          "col_1": "52 pointsbykashifr5 hours ago|hide|3 comments"
+        },
+        {
+          "col_0": "14.",
+          "col_1": "",
+          "col_2": "CharlotteOS – An Experimental Modern Operating System(github.com/charlotte-os)"
+        },
+        {
+          "col_0": "",
+          "col_1": "127 pointsbyementally8 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "15.",
+          "col_1": "",
+          "col_2": "Visible from space, Sudan's bloodied sands expose a massacre of thousands(telegraph.co.uk)"
+        },
+        {
+          "col_0": "",
+          "col_1": "167 pointsbywslh3 hours ago|hide|51 comments"
+        },
+        {
+          "col_0": "16.",
+          "col_1": "",
+          "col_2": "Open-Source Ada: From Gateware to Application(adacore.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "42 pointsbyBogdanp6 hours ago|hide|7 comments"
+        },
+        {
+          "col_0": "17.",
+          "col_1": "",
+          "col_2": "Ask HN: Where to begin with \"modern\" Emacs?"
+        },
+        {
+          "col_0": "",
+          "col_1": "58 pointsbyweakfish4 hours ago|hide|46 comments"
+        },
+        {
+          "col_0": "18.",
+          "col_1": "",
+          "col_2": "Reconfigurable Analog Computers(arxiv.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "13 pointsbygidellav3 hours ago|hide|4 comments"
+        },
+        {
+          "col_0": "19.",
+          "col_1": "",
+          "col_2": "Hard Rust requirements from May onward(debian.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "280 pointsbyrkta13 hours ago|hide|470 comments"
+        },
+        {
+          "col_0": "20.",
+          "col_1": "",
+          "col_2": "I built my own CityMapper(asherfalcon.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "84 pointsbyashfn8 hours ago|hide|11 comments"
+        },
+        {
+          "col_0": "21.",
+          "col_1": "",
+          "col_2": "'Chinese lantern' structure shifts into many shapes for various applications(techxplore.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "10 pointsbyPaulHoule1 hour ago|hide|discuss"
+        },
+        {
+          "col_0": "22.",
+          "col_1": "",
+          "col_2": "Studies increasingly find links between air pollutants and dementia(nytimes.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "98 pointsbyquapster4 hours ago|hide|73 comments"
+        },
+        {
+          "col_0": "23.",
+          "col_1": "",
+          "col_2": "NJVL: Nim's New Intermediate Representation(github.com/nim-lang)"
+        },
+        {
+          "col_0": "",
+          "col_1": "37 pointsbygenerichuman7 hours ago|hide|1 comment"
+        },
+        {
+          "col_0": "24.",
+          "col_1": "",
+          "col_2": "Czech police forced to turn off facial recognition cameras at the Prague airport(edri.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "51 pointsbycampuscodi2 hours ago|hide|5 comments"
+        },
+        {
+          "col_0": "25.",
+          "col_1": "",
+          "col_2": "Self-help gets philosophical(thedriftmag.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "69 pointsbyXzetaU84 hours ago|hide|70 comments"
+        },
+        {
+          "col_0": "26.",
+          "col_1": "",
+          "col_2": "Frank Gasking on preserving «lost» games(spillhistorie.no)"
+        },
+        {
+          "col_0": "",
+          "col_1": "64 pointsbydoener9 hours ago|hide|13 comments"
+        },
+        {
+          "col_0": "27.",
+          "col_1": "",
+          "col_2": "Data centers contribute to high prices as energy bills electrify local politics(wsj.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "71 pointsbymoose_man5 hours ago|hide|38 comments"
+        },
+        {
+          "col_0": "28.",
+          "col_1": "",
+          "col_2": "How I stopped worrying and started loving the Assembly(medium.com/jonas.eschenburg)"
+        },
+        {
+          "col_0": "",
+          "col_1": "166 pointsbyindyjo17 hours ago|hide|28 comments"
+        },
+        {
+          "col_0": "29.",
+          "col_1": "",
+          "col_2": "FFmpeg Dealing with a Security Researcher(twitter.com/ffmpeg)"
+        },
+        {
+          "col_0": "",
+          "col_1": "4 pointsbytrollied30 minutes ago|hide|discuss"
+        },
+        {
+          "col_0": "30.",
+          "col_1": "",
+          "col_2": "S.A.R.C.A.S.M: Slightly Annoying Rubik's Cube Automatic Solving Machine(github.com/vindar)"
+        },
+        {
+          "col_0": "",
+          "col_1": "256 pointsbychris_overseas22 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "",
+          "col_1": "More"
+        },
+        {
+          "col_0": "Consider applying for YC's Winter 2026 batch! Applications are open till Nov 10Guidelines|FAQ|Lists|API|Security|Legal|Apply to YC|ContactSearch:",
+          "col_1": ""
+        },
+        {
+          "col_0": ""
+        }
+      ],
+      "row_count": 66,
+      "class": ""
+    },
+    {
+      "table_id": 1,
+      "headers": [],
+      "rows": [
+        {
+          "col_0": "",
+          "col_1": "Hacker Newsnew|past|comments|ask|show|jobs|submit",
+          "col_2": "login"
+        }
+      ],
+      "row_count": 1,
+      "class": ""
+    },
+    {
+      "table_id": 2,
+      "headers": [],
+      "rows": [
+        {
+          "col_0": "1.",
+          "col_1": "",
+          "col_2": "Updated practice for review articles and position papers in ArXiv CS category(arxiv.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "367 pointsbydw646 hours ago|hide|161 comments"
+        },
+        {
+          "col_0": "2.",
+          "col_1": "",
+          "col_2": "GHC now runs in the browser(haskell.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "180 pointsbykaycebasques5 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "3.",
+          "col_1": "",
+          "col_2": "Claude Code Can Debug Low-Level Cryptography(filippo.io)"
+        },
+        {
+          "col_0": "",
+          "col_1": "59 pointsbyBogdanp2 hours ago|hide|20 comments"
+        },
+        {
+          "col_0": "4.",
+          "col_1": "",
+          "col_2": "Beginner-friendly, unofficial documentation for Helix text editor(helix-editor.vercel.app)"
+        },
+        {
+          "col_0": "",
+          "col_1": "39 pointsbyCuriositry1 hour ago|hide|8 comments"
+        },
+        {
+          "col_0": "5.",
+          "col_1": "",
+          "col_2": "Show HN: Why write code if the LLM can just do the thing? (web app experiment)(github.com/samrolken)"
+        },
+        {
+          "col_0": "",
+          "col_1": "131 pointsbysamrolken3 hours ago|hide|118 comments"
+        },
+        {
+          "col_0": "6.",
+          "col_1": "",
+          "col_2": "Dating: A Mysterious Constellation of Facts(dynomight.net)"
+        },
+        {
+          "col_0": "",
+          "col_1": "27 pointsbytobr2 hours ago|hide|19 comments"
+        },
+        {
+          "col_0": "7.",
+          "col_1": "",
+          "col_2": "SQLite concurrency and why you should care about it(jellyfin.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "213 pointsbyHunOL8 hours ago|hide|96 comments"
+        },
+        {
+          "col_0": "8.",
+          "col_1": "",
+          "col_2": "Austria: Pylons as sculpture for public acceptance of expanding electrification(goodgoodgood.co)"
+        },
+        {
+          "col_0": "",
+          "col_1": "65 pointsbyGeekette4 hours ago|hide|32 comments"
+        },
+        {
+          "col_0": "9.",
+          "col_1": "",
+          "col_2": "Word2vec-style vector arithmetic on docs embeddings(technicalwriting.dev)"
+        },
+        {
+          "col_0": "",
+          "col_1": "22 pointsbykaycebasques2 hours ago|hide|2 comments"
+        },
+        {
+          "col_0": "10.",
+          "col_1": "",
+          "col_2": "Chat Control proposal fails again after public opposition(andreafortuna.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "342 pointsbyspeckx4 hours ago|hide|100 comments"
+        },
+        {
+          "col_0": "11.",
+          "col_1": "",
+          "col_2": "The hardest program I've ever written (2015)(stuffwithstuff.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "25 pointsbyjacobedawson3 hours ago|hide|9 comments"
+        },
+        {
+          "col_0": "12.",
+          "col_1": "",
+          "col_2": "From 400 Mbps to 1.7 Gbps: A WiFi 7 Debugging Journey(tymscar.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "10 pointsbytymscar1 hour ago|hide|2 comments"
+        },
+        {
+          "col_0": "13.",
+          "col_1": "",
+          "col_2": "The Smol Training Playbook: The Secrets to Building World-Class LLMs(huggingface.co)"
+        },
+        {
+          "col_0": "",
+          "col_1": "52 pointsbykashifr5 hours ago|hide|3 comments"
+        },
+        {
+          "col_0": "14.",
+          "col_1": "",
+          "col_2": "CharlotteOS – An Experimental Modern Operating System(github.com/charlotte-os)"
+        },
+        {
+          "col_0": "",
+          "col_1": "127 pointsbyementally8 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "15.",
+          "col_1": "",
+          "col_2": "Visible from space, Sudan's bloodied sands expose a massacre of thousands(telegraph.co.uk)"
+        },
+        {
+          "col_0": "",
+          "col_1": "167 pointsbywslh3 hours ago|hide|51 comments"
+        },
+        {
+          "col_0": "16.",
+          "col_1": "",
+          "col_2": "Open-Source Ada: From Gateware to Application(adacore.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "42 pointsbyBogdanp6 hours ago|hide|7 comments"
+        },
+        {
+          "col_0": "17.",
+          "col_1": "",
+          "col_2": "Ask HN: Where to begin with \"modern\" Emacs?"
+        },
+        {
+          "col_0": "",
+          "col_1": "58 pointsbyweakfish4 hours ago|hide|46 comments"
+        },
+        {
+          "col_0": "18.",
+          "col_1": "",
+          "col_2": "Reconfigurable Analog Computers(arxiv.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "13 pointsbygidellav3 hours ago|hide|4 comments"
+        },
+        {
+          "col_0": "19.",
+          "col_1": "",
+          "col_2": "Hard Rust requirements from May onward(debian.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "280 pointsbyrkta13 hours ago|hide|470 comments"
+        },
+        {
+          "col_0": "20.",
+          "col_1": "",
+          "col_2": "I built my own CityMapper(asherfalcon.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "84 pointsbyashfn8 hours ago|hide|11 comments"
+        },
+        {
+          "col_0": "21.",
+          "col_1": "",
+          "col_2": "'Chinese lantern' structure shifts into many shapes for various applications(techxplore.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "10 pointsbyPaulHoule1 hour ago|hide|discuss"
+        },
+        {
+          "col_0": "22.",
+          "col_1": "",
+          "col_2": "Studies increasingly find links between air pollutants and dementia(nytimes.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "98 pointsbyquapster4 hours ago|hide|73 comments"
+        },
+        {
+          "col_0": "23.",
+          "col_1": "",
+          "col_2": "NJVL: Nim's New Intermediate Representation(github.com/nim-lang)"
+        },
+        {
+          "col_0": "",
+          "col_1": "37 pointsbygenerichuman7 hours ago|hide|1 comment"
+        },
+        {
+          "col_0": "24.",
+          "col_1": "",
+          "col_2": "Czech police forced to turn off facial recognition cameras at the Prague airport(edri.org)"
+        },
+        {
+          "col_0": "",
+          "col_1": "51 pointsbycampuscodi2 hours ago|hide|5 comments"
+        },
+        {
+          "col_0": "25.",
+          "col_1": "",
+          "col_2": "Self-help gets philosophical(thedriftmag.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "69 pointsbyXzetaU84 hours ago|hide|70 comments"
+        },
+        {
+          "col_0": "26.",
+          "col_1": "",
+          "col_2": "Frank Gasking on preserving «lost» games(spillhistorie.no)"
+        },
+        {
+          "col_0": "",
+          "col_1": "64 pointsbydoener9 hours ago|hide|13 comments"
+        },
+        {
+          "col_0": "27.",
+          "col_1": "",
+          "col_2": "Data centers contribute to high prices as energy bills electrify local politics(wsj.com)"
+        },
+        {
+          "col_0": "",
+          "col_1": "71 pointsbymoose_man5 hours ago|hide|38 comments"
+        },
+        {
+          "col_0": "28.",
+          "col_1": "",
+          "col_2": "How I stopped worrying and started loving the Assembly(medium.com/jonas.eschenburg)"
+        },
+        {
+          "col_0": "",
+          "col_1": "166 pointsbyindyjo17 hours ago|hide|28 comments"
+        },
+        {
+          "col_0": "29.",
+          "col_1": "",
+          "col_2": "FFmpeg Dealing with a Security Researcher(twitter.com/ffmpeg)"
+        },
+        {
+          "col_0": "",
+          "col_1": "4 pointsbytrollied30 minutes ago|hide|discuss"
+        },
+        {
+          "col_0": "30.",
+          "col_1": "",
+          "col_2": "S.A.R.C.A.S.M: Slightly Annoying Rubik's Cube Automatic Solving Machine(github.com/vindar)"
+        },
+        {
+          "col_0": "",
+          "col_1": "256 pointsbychris_overseas22 hours ago|hide|54 comments"
+        },
+        {
+          "col_0": "",
+          "col_1": "More"
+        }
+      ],
+      "row_count": 61,
+      "class": ""
+    },
+    {
+      "table_id": 3,
+      "headers": [],
+      "rows": [
+        {
+          "col_0": ""
+        }
+      ],
+      "row_count": 1,
+      "class": ""
+    }
+  ],
+  "cards": [],
+  "lists": [],
   "links": [],
   "images": [],
-  "tables": [],
-  "lists": [],
   "forms": [],
   "buttons": [],
-  "cards": [],
   "divs": [],
   "spans": [],
   "headings": [],
@@ -20,13 +782,13 @@
   "summary": {
     "links_count": 0,
     "images_count": 0,
-    "tables_count": 0,
+    "tables_count": 4,
     "lists_count": 0,
     "forms_count": 0,
     "buttons_count": 0,
     "cards_count": 0,
     "divs_count": 0,
     "headings_count": 0,
-    "total_elements": 0
+    "total_elements": 4
   }
 }

@@ -57,6 +57,8 @@ class ChartExtractorTool(BaseTool):
         required_fields: Optional[List[str]] = None,
         page: Optional[Page] = None,
         limit: Optional[int] = None,
+        requested_count: Optional[int] = None,
+        task_description: Optional[str] = None,
         **kwargs
     ) -> ToolResult:
         """
@@ -67,6 +69,8 @@ class ChartExtractorTool(BaseTool):
             required_fields: List of field names to extract
             page: Playwright page instance (if already navigated)
             limit: Maximum number of records to extract
+            requested_count: Number of records expected (for completeness check)
+            task_description: Original task description for context (optional)
             **kwargs: Additional parameters
             
         Returns:
@@ -95,12 +99,19 @@ class ChartExtractorTool(BaseTool):
                     # Run in a new thread to avoid nested loop issues
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._run_in_new_loop, url, required_fields, page, limit, **kwargs)
+                        future = executor.submit(
+                            self._run_in_new_loop, 
+                            url, required_fields, page, limit, 
+                            requested_count, task_description, **kwargs
+                        )
                         return future.result()
             
             # Run the async code
             result = loop.run_until_complete(
-                self._async_execute(url, required_fields, page, limit, **kwargs)
+                self._async_execute(
+                    url, required_fields, page, limit, 
+                    requested_count, task_description, **kwargs
+                )
             )
             
             return result
@@ -121,6 +132,8 @@ class ChartExtractorTool(BaseTool):
         required_fields: Optional[List[str]],
         page: Optional[Page],
         limit: Optional[int],
+        requested_count: Optional[int],
+        task_description: Optional[str],
         **kwargs
     ) -> ToolResult:
         """
@@ -131,6 +144,8 @@ class ChartExtractorTool(BaseTool):
             required_fields: Fields to extract
             page: Playwright page
             limit: Max records
+            requested_count: Number of records expected
+            task_description: Original task description
             **kwargs: Additional params
             
         Returns:
@@ -140,7 +155,10 @@ class ChartExtractorTool(BaseTool):
         asyncio.set_event_loop(new_loop)
         try:
             return new_loop.run_until_complete(
-                self._async_execute(url, required_fields, page, limit, **kwargs)
+                self._async_execute(
+                    url, required_fields, page, limit,
+                    requested_count, task_description, **kwargs
+                )
             )
         finally:
             new_loop.close()
@@ -151,6 +169,8 @@ class ChartExtractorTool(BaseTool):
         required_fields: Optional[List[str]],
         page: Optional[Page],
         limit: Optional[int],
+        requested_count: Optional[int],
+        task_description: Optional[str],
         **kwargs
     ) -> ToolResult:
         """
@@ -161,6 +181,8 @@ class ChartExtractorTool(BaseTool):
             required_fields: Fields to extract
             page: Playwright page
             limit: Max records
+            requested_count: Number of records expected
+            task_description: Original task description
             **kwargs: Additional params
             
         Returns:
@@ -242,12 +264,28 @@ class ChartExtractorTool(BaseTool):
                 print(f"[CHART_TOOL] Extracting from {url}")
                 print(f"[CHART_TOOL] Required fields: {required_fields}")
                 
-                # Extract data
-                records = await self.extractor.extract_chart(
-                    page=page,
-                    url=url,
-                    required_fields=required_fields
-                )
+                # Extract data with 60 second timeout
+                try:
+                    records = await asyncio.wait_for(
+                        self.extractor.extract_chart(
+                            page=page,
+                            url=url,
+                            required_fields=required_fields,
+                            limit=limit  # Pass limit to extractor for early termination
+                        ),
+                        timeout=60.0  # 60 second timeout
+                    )
+                except asyncio.TimeoutError:
+                    print(f"[CHART_TOOL] ⏱️ Extraction timeout after 60 seconds")
+                    return ToolResult(
+                        success=False,
+                        error="Extraction timeout after 60 seconds. Page may be too complex.",
+                        metadata={
+                            "url": url,
+                            "required_fields": required_fields,
+                            "timeout": True
+                        }
+                    )
                 
                 # Apply limit if specified
                 if limit and isinstance(records, list):
@@ -265,8 +303,20 @@ class ChartExtractorTool(BaseTool):
                 
                 print(f"[CHART_TOOL] Successfully extracted {len(records)} records")
                 
-                # Check completeness
-                validation = self._validate_extraction(records, required_fields, url)
+                # Add universal completeness metadata
+                completeness_metadata = self._add_completeness_metadata(
+                    data=records,
+                    requested_count=requested_count or limit,
+                    requested_fields=required_fields,
+                    task_description=task_description
+                )
+                
+                # Log completeness status
+                if not completeness_metadata.get("complete", True):
+                    print(f"[CHART_TOOL] ⚠️ INCOMPLETE: {completeness_metadata.get('reason')}")
+                    print(f"[CHART_TOOL] Coverage: {completeness_metadata.get('coverage', 0):.0%}")
+                else:
+                    print(f"[CHART_TOOL] ✓ Complete")
                 
                 return ToolResult(
                     success=True,
@@ -276,10 +326,7 @@ class ChartExtractorTool(BaseTool):
                         "count": len(records),
                         "required_fields": required_fields,
                         "extracted_fields": list(records[0].keys()) if records else [],
-                        "complete": validation.get("complete", True),
-                        "coverage": validation.get("coverage", 1.0),
-                        "missing_fields": validation.get("missing_fields", []),
-                        "validation": validation
+                        **completeness_metadata
                     }
                 )
             

@@ -42,6 +42,9 @@ class APICallTool(BaseTool):
             headers: Optional headers dict
             body: Optional request body for POST (will be sent as JSON)
             timeout: Request timeout in seconds (default: 10)
+            requested_count: Number of items expected (optional)
+            requested_fields: List of fields expected in results (optional)
+            task_description: Original task description for context (optional)
         
         Returns:
             ToolResult with success status and data
@@ -57,6 +60,11 @@ class APICallTool(BaseTool):
         headers = kwargs.get("headers", {})
         body = kwargs.get("body")
         timeout = kwargs.get("timeout", 10)
+        
+        # Extract completeness validation parameters
+        requested_count = kwargs.get("requested_count")
+        requested_fields = kwargs.get("requested_fields")
+        task_description = kwargs.get("task_description")
         
         print(f"[API_CALL] {method} {url}")
         if params:
@@ -80,13 +88,32 @@ class APICallTool(BaseTool):
                 data = response.text
                 print(f"[API_CALL] ✓ Success: {len(data)} chars text")
             
+            # Add completeness metadata
+            completeness_metadata = self._add_completeness_metadata(
+                data=data,
+                requested_count=requested_count,
+                requested_fields=requested_fields,
+                task_description=task_description
+            )
+            
+            # Build result metadata
+            result_metadata = {
+                "status_code": response.status_code,
+                "url": response.url,
+                **completeness_metadata
+            }
+            
+            # Log completeness status
+            if not completeness_metadata.get("complete", True):
+                print(f"[API_CALL] ⚠️ INCOMPLETE: {completeness_metadata.get('reason')}")
+                print(f"[API_CALL] Coverage: {completeness_metadata.get('coverage', 0):.0%}")
+            else:
+                print(f"[API_CALL] ✓ Complete")
+            
             return ToolResult(
                 success=True,
                 data=data,
-                metadata={
-                    "status_code": response.status_code,
-                    "url": response.url
-                }
+                metadata=result_metadata
             )
             
         except requests.exceptions.Timeout:

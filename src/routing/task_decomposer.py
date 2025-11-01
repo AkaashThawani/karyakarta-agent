@@ -3,12 +3,14 @@ LLM-Based Task Decomposer
 
 Uses LLM to decompose user tasks into structured subtasks
 based on the tool registry capabilities.
+Uses DataFlowResolver for schema-based parameter mapping.
 """
 
 import json
 import re
 from typing import List, Dict, Any, Optional
 from src.routing.tool_capabilities import format_registry_for_llm
+from src.core.data_flow_resolver import get_resolver
 
 
 class TaskDecomposer:
@@ -57,9 +59,10 @@ class TaskDecomposer:
         if task_structure and task_structure.get("type") != "single":
             print(f"[DECOMPOSER] Using pre-analyzed task structure: {task_structure.get('type')}")
         
-        # Check if we have pre-analyzed sequential steps (saves LLM call!)
-        if task_structure.get("type") == "sequential" and task_structure.get("steps"):
-            print(f"[DECOMPOSER] ⚡ Using pre-analyzed sequential steps (no LLM call)")
+        # Check if we have pre-analyzed steps (saves LLM call!) - type-agnostic
+        if task_structure.get("steps"):
+            structure_type = task_structure.get("type", "unknown")
+            print(f"[DECOMPOSER] ⚡ Using pre-analyzed steps (type: {structure_type}, no LLM call)")
             
             # DEBUG LOGGING
             print(f"[DECOMPOSER] 🔍 DEBUG: task_structure = {task_structure}")
@@ -431,20 +434,22 @@ Return ONLY the JSON array (no markdown, no explanation):"""
                 tool = step.get("tool", "google_search")
                 print(f"[DECOMPOSER] Step {i+1}: {step_desc[:50]}... → {tool}")
                 
-                # NEW: Use LLM-provided parameters if available!
-                if "parameters" in step and step["parameters"]:
-                    parameters = step["parameters"]
-                    print(f"[DECOMPOSER] ✓ Using LLM-provided parameters: {parameters}")
-                else:
-                    # Fallback: generate parameters
-                    print(f"[DECOMPOSER] No parameters in step, generating...")
-                    parameters = self._map_parameters_for_tool(
-                        tool, 
-                        step_desc, 
-                        query_params, 
-                        required_fields,
-                        original_description
-                    )
+                # Get LLM-provided parameters (may be incomplete)
+                llm_params = step.get("parameters", {})
+                
+                # ALWAYS call schema-based mapping to fill gaps from context
+                schema_params = self._map_parameters_for_tool(
+                    tool, 
+                    step_desc, 
+                    query_params, 
+                    required_fields,  # ← From context
+                    original_description
+                )
+                
+                # Merge: Schema provides defaults/required, LLM overrides with specifics
+                parameters = {**schema_params, **llm_params}
+                
+                print(f"[DECOMPOSER] ✓ Merged parameters (schema + LLM): {parameters}")
             else:
                 # Fallback for unexpected format
                 step_desc = str(step)
@@ -483,86 +488,112 @@ Return ONLY the JSON array (no markdown, no explanation):"""
         original_description: str = ""
     ) -> Dict[str, Any]:
         """
-        Map step description to proper tool parameters.
+        Map step description to proper tool parameters using schema.
+        ZERO HARDCODING - uses tool_io_schema.json for all mappings.
         
         Args:
             tool: Tool name
             step_desc: Step description
             query_params: Query parameters from analysis
             required_fields: Required fields from analysis
-            original_description: Original user task description (for URL extraction)
+            original_description: Original user task description
             
         Returns:
             Tool-specific parameters dict
         """
-        if tool == "playwright_execute":
-            # Extract URL from step description first
-            import re
-            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-            url_match = re.search(url_pattern, step_desc)
-            
-            if url_match:
-                url = url_match.group(0).rstrip(',.;:!?')
-                print(f"[DECOMPOSER] ✓ Found URL in step: {url}")
-                return {
-                    "url": url,
-                    "method": "goto"
-                }
-            
-            # If not found in step, try original description
-            if original_description:
-                url_match = re.search(url_pattern, original_description)
-                if url_match:
-                    url = url_match.group(0).rstrip(',.;:!?')
-                    print(f"[DECOMPOSER] ✓ Found URL in original description: {url}")
-                    return {
-                        "url": url,
-                        "method": "goto"
-                    }
-            
-            # No URL found anywhere
-            print(f"[DECOMPOSER] ⚠️ No URL found for playwright_execute step")
+        resolver = get_resolver()
+        
+        # Get tool's input schema
+        tool_inputs = resolver.get_tool_inputs(tool)
+        
+        if not tool_inputs:
+            # No schema, return minimal params
+            print(f"[DECOMPOSER] No schema for {tool}, using step description as query")
             return {"query": step_desc}
         
-        elif tool == "chart_extractor":
-            # Use required fields and limit from analysis
-            params = {}
+        params = {}
+        
+        # For each input in schema, try to provide a value
+        for input_name, input_spec in tool_inputs.items():
+            # Skip if not required and we can't infer a value
+            if not input_spec.get("required", False):
+                # Add defaults if specified
+                if "default" in input_spec:
+                    params[input_name] = input_spec["default"]
+                continue
             
-            if required_fields:
-                params["required_fields"] = required_fields
+            # Map based on input type and context
+            input_type = input_spec.get("type")
             
-            if query_params.get("limit"):
-                params["limit"] = query_params["limit"]
-            
-            # If no specific params, at least pass the description
-            if not params:
+            if input_name == "query":
+                # Query input - use step description
                 params["query"] = step_desc
             
-            return params
-        
-        elif tool == "google_search":
-            # Search just needs the query
-            return {"query": step_desc}
-        
-        elif tool == "api_call":
-            # Extract URL and method if present
-            import re
-            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-            url_match = re.search(url_pattern, step_desc)
+            elif input_name == "url":
+                # URL input - extract from descriptions
+                url = self._extract_url(step_desc, original_description)
+                if url:
+                    params["url"] = url
             
-            params = {
-                "method": "GET",
-                "params": query_params
-            }
+            elif input_name == "required_fields":
+                # Required fields - use from analysis
+                if required_fields:
+                    params["required_fields"] = required_fields
             
-            if url_match:
-                params["url"] = url_match.group(0).rstrip(',.;:!?')
+            elif input_name == "limit":
+                # Limit - use from query_params
+                if query_params.get("limit"):
+                    params["limit"] = query_params["limit"]
             
-            return params
+            elif input_name == "method":
+                # Method for playwright - default to goto
+                params["method"] = "goto"
+            
+            elif input_name == "params":
+                # Query params for API calls
+                if query_params:
+                    params["params"] = query_params
+            
+            elif input_name == "args":
+                # Args - default to empty dict
+                params["args"] = {}
         
-        else:
-            # Default: pass as query
-            return {"query": step_desc}
+        # If no params were set, provide minimal fallback
+        if not params:
+            params = {"query": step_desc}
+        
+        return params
+    
+    def _extract_url(self, step_desc: str, original_desc: str = "") -> Optional[str]:
+        """
+        Extract URL from descriptions (schema-agnostic helper).
+        
+        Args:
+            step_desc: Step description
+            original_desc: Original task description
+            
+        Returns:
+            Extracted URL or None
+        """
+        import re
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        
+        # Try step description first
+        match = re.search(url_pattern, step_desc)
+        if match:
+            url = match.group(0).rstrip(',.;:!?')
+            print(f"[DECOMPOSER] ✓ Found URL in step: {url}")
+            return url
+        
+        # Try original description
+        if original_desc:
+            match = re.search(url_pattern, original_desc)
+            if match:
+                url = match.group(0).rstrip(',.;:!?')
+                print(f"[DECOMPOSER] ✓ Found URL in original: {url}")
+                return url
+        
+        return None
     
     def _apply_query_params(self, subtasks: List[Dict[str, Any]], query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
         """

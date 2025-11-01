@@ -1,0 +1,21 @@
+{
+  "news.ycombinator.com": [
+    {
+      "pattern": {
+        "container": "body",
+        "row": "div, li",
+        "fields": {
+          "title": "a:has-text('Updated practice for')",
+          "url": "span.sitestr"
+        }
+      },
+      "fields": [
+        "title",
+        "url"
+      ],
+      "success_rate": 0.9,
+      "last_used": "2025-11-01T14:32:35.970906",
+      "use_count": 1
+    }
+  ]
+}

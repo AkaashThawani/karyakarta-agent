@@ -10,16 +10,18 @@ Features:
 - Falls back to lxml and pandas when needed
 - Smart search to find relevant data
 - PARALLEL EXTRACTION - 3-4x faster than serial!
+- DFS tree traversal for nested content extraction
 """
 
 from selectolax.parser import HTMLParser
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 import re
 import asyncio
+import time
 
 
 class UniversalExtractor:
-    """Extract EVERYTHING from HTML - no element left behind! With parallel processing!"""
+    """Extract EVERYTHING from HTML - no element left behind! With streaming parallel processing!"""
     
     def extract_everything(self, html: str, url: str = '') -> Dict[str, Any]:
         """
@@ -34,115 +36,159 @@ class UniversalExtractor:
         
         return loop.run_until_complete(self.extract_everything_async(html, url))
     
-    async def _extract_with_logging(self, method_name: str, func, *args):
-        """Wrapper to add logging before/after extraction methods"""
-        # Removed excessive logging - only log on error
-        try:
-            result = await asyncio.to_thread(func, *args)
-            return result
-        except Exception as e:
-            print(f"[EXTRACT] ❌ Failed {method_name}: {e}")
-            raise
-    
-    async def extract_everything_async(self, html: str, url: str = '') -> Dict[str, Any]:
+    async def _stream_extractor(
+        self, 
+        extractor_func: Callable, 
+        tree: HTMLParser, 
+        result_queue: asyncio.Queue, 
+        key: str,
+        batch_size: int = 5,
+        **kwargs
+    ):
         """
-        Extract ALL elements in PARALLEL with 2-minute timeout.
+        Generic streaming wrapper for ANY extractor function.
+        Pushes results in batches as they're found.
+        
+        Args:
+            extractor_func: Extraction function to wrap
+            tree: HTML tree
+            result_queue: Queue to push results to
+            key: Result key name ('tables', 'cards', etc.)
+            batch_size: Items per batch (default: 5, safer for 60s timeout)
+            **kwargs: Additional args for extractor (e.g., url for metadata)
+        """
+        try:
+            # Run extractor
+            if kwargs:
+                data = await asyncio.to_thread(extractor_func, tree, **kwargs)
+            else:
+                data = await asyncio.to_thread(extractor_func, tree)
+            
+            # Push in batches
+            if isinstance(data, list):
+                for i in range(0, len(data), batch_size):
+                    batch = data[i:i+batch_size]
+                    await result_queue.put((key, batch))
+            else:
+                # Non-list data (like metadata)
+                await result_queue.put((key, data))
+        
+        except Exception as e:
+            print(f"[EXTRACT] {key} error: {e}")
+            await result_queue.put((key, [] if key != 'metadata' else {}))
+    
+    async def extract_everything_async(self, html: str, url: str = '', limit: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Streaming extraction - pushes batches of 5 as found, 60s timeout.
         
         Args:
             html: HTML string to parse
             url: Source URL (for context)
+            limit: Optional limit - stops when enough records collected
             
         Returns:
             Dictionary with all extracted data organized by type
         """
         tree = HTMLParser(html)
+        result_queue = asyncio.Queue()
         
-        try:
-            # Run ALL 13 extractions in parallel with 30-second timeout!
-            async with asyncio.timeout(30):  # 30 seconds
-                print(f"[EXTRACT] 🚀 Starting parallel extraction of 13 element types (30s timeout)")
-                
-                results = await asyncio.gather(
-                    self._extract_with_logging('extract_metadata', self._extract_metadata, tree, url),
-                    self._extract_with_logging('extract_links', self._extract_links, tree),
-                    self._extract_with_logging('extract_images', self._extract_images, tree),
-                    self._extract_with_logging('extract_tables', self._extract_tables, tree),
-                    self._extract_with_logging('extract_lists', self._extract_lists, tree),
-                    self._extract_with_logging('extract_forms', self._extract_forms, tree),
-                    self._extract_with_logging('extract_buttons', self._extract_buttons, tree),
-                    self._extract_with_logging('extract_cards', self._extract_cards, tree),
-                    self._extract_with_logging('extract_divs', self._extract_divs, tree),
-                    self._extract_with_logging('extract_spans', self._extract_spans, tree),
-                    self._extract_with_logging('extract_headings', self._extract_headings, tree),
-                    self._extract_with_logging('extract_paragraphs', self._extract_paragraphs, tree),
-                    self._extract_with_logging('extract_data_attributes', self._extract_data_attributes, tree),
-                    return_exceptions=True
+        # Define extractors (key, function, has_url_param)
+        extractors = [
+            ('metadata', self._extract_metadata, True),  # Needs url
+            ('tables', self._extract_tables, False),
+            ('cards', self._extract_cards, False),
+            ('lists', self._extract_lists, False),
+            ('links', self._extract_links, False),
+            ('images', self._extract_images, False),
+            ('forms', self._extract_forms, False),
+            ('buttons', self._extract_buttons, False),
+            ('divs', self._extract_divs, False),
+            ('spans', self._extract_spans, False),
+            ('headings', self._extract_headings, False),
+            ('paragraphs', self._extract_paragraphs, False),
+            ('data_attributes', self._extract_data_attributes, False)
+        ]
+        
+        print(f"[EXTRACT] 🚀 Starting streaming extraction (60s timeout, batches of 5)")
+        if limit:
+            print(f"[EXTRACT] 🎯 Will stop at {limit} records")
+        
+        # Start ALL extractors with generic wrapper (zero hardcoding)
+        tasks = []
+        for key, func, has_url in extractors:
+            if has_url:
+                task = asyncio.create_task(
+                    self._stream_extractor(func, tree, result_queue, key, batch_size=5, url=url)
                 )
-                
-                # Build result dict
-                keys = ['metadata', 'links', 'images', 'tables', 'lists',
-                       'forms', 'buttons', 'cards', 'divs', 'spans',
-                       'headings', 'paragraphs', 'data_attributes']
-                
-                result = {}
-                for i, key in enumerate(keys):
-                    if isinstance(results[i], Exception):
-                        print(f"[EXTRACT] ⚠️ {key} extraction failed: {results[i]}")
-                        result[key] = [] if key != 'metadata' else {}
-                    else:
-                        result[key] = results[i]
-                        count = len(result[key]) if isinstance(result[key], list) else 1
-                        print(f"[EXTRACT] ✅ {key}: {count} items")
-                
-                # Add summary
-                result['summary'] = self._create_summary(result)
-                
-                print(f"[EXTRACT] 🎉 Parallel extraction complete!")
-                return result
-                
-        except asyncio.TimeoutError:
-            print(f"[EXTRACT] ⚠️ Timeout after 30 seconds - returning empty result")
-            return {
-                'metadata': {},
-                'links': [],
-                'images': [],
-                'tables': [],
-                'lists': [],
-                'forms': [],
-                'buttons': [],
-                'cards': [],
-                'divs': [],
-                'spans': [],
-                'headings': [],
-                'paragraphs': [],
-                'data_attributes': [],
-                'summary': {'total_elements': 0}
-            }
-        except Exception as e:
-            print(f"[EXTRACT] ❌ Parallel extraction failed: {e}")
-            # Fallback to serial extraction with timeout
-            print(f"[EXTRACT] Falling back to serial extraction with 30s timeout...")
+            else:
+                task = asyncio.create_task(
+                    self._stream_extractor(func, tree, result_queue, key, batch_size=5)
+                )
+            tasks.append(task)
+        
+        # Initialize result with empty arrays (metadata is special case)
+        result: Dict[str, Any] = {}
+        for key, _, _ in extractors:
+            result[key] = {} if key == 'metadata' else []
+        
+        total_records = 0
+        start_time = time.time()
+        
+        # Collect results as they stream in (60s max)
+        while True:
+            # Time limit check
+            elapsed = time.time() - start_time
+            if elapsed > 60:
+                print(f"[EXTRACT] ⏱️ 60s timeout - returning {total_records} records collected")
+                break
+            
+            # Record limit check
+            if limit and total_records >= limit:
+                print(f"[EXTRACT] ⚡ Reached limit ({limit})")
+                break
+            
             try:
-                async with asyncio.timeout(30):
-                    return await asyncio.to_thread(self._extract_serial, tree, url)
+                # Wait for next batch (1s timeout to check conditions)
+                key, batch = await asyncio.wait_for(result_queue.get(), timeout=1.0)
+                
+                # Add batch to result
+                if isinstance(batch, list):
+                    result[key].extend(batch)
+                    count = len(batch)
+                    
+                    # Count records (tables have rows, others are direct items)
+                    if key == 'tables':
+                        total_records += sum(len(t.get('rows', [])) for t in batch)
+                    else:
+                        total_records += count
+                    
+                    print(f"[EXTRACT] +{count} {key} (total: {total_records} records)")
+                else:
+                    # Metadata or other non-list data
+                    result[key] = batch
+            
             except asyncio.TimeoutError:
-                print(f"[EXTRACT] ⚠️ Serial extraction timeout - returning empty result")
-                return {
-                    'metadata': {},
-                    'links': [],
-                    'images': [],
-                    'tables': [],
-                    'lists': [],
-                    'forms': [],
-                    'buttons': [],
-                    'cards': [],
-                    'divs': [],
-                    'spans': [],
-                    'headings': [],
-                    'paragraphs': [],
-                    'data_attributes': [],
-                    'summary': {'total_elements': 0}
-                }
+                # No data for 1s - check if all tasks done
+                if all(task.done() for task in tasks):
+                    print(f"[EXTRACT] All extractors complete ({total_records} records)")
+                    break
+                # Otherwise keep waiting
+        
+        # Cancel any remaining tasks
+        cancelled_count = 0
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+                cancelled_count += 1
+        
+        if cancelled_count > 0:
+            print(f"[EXTRACT] Cancelled {cancelled_count} remaining tasks")
+        
+        # Add summary
+        result['summary'] = self._create_summary(result)
+        
+        print(f"[EXTRACT] ✅ Streaming extraction complete: {total_records} records in {elapsed:.1f}s")
+        return result
     
     def _extract_serial(self, tree, url: str) -> Dict[str, Any]:
         """Fallback serial extraction if parallel fails"""
@@ -177,6 +223,128 @@ class UniversalExtractor:
             'keywords': keywords_elem.attributes.get('content', '') if keywords_elem else ''
         }
     
+    def _extract_cell_content(self, element) -> Dict[str, Any]:
+        """
+        Recursive DFS extraction of ALL content from an element at ANY depth.
+        
+        Traverses entire element tree using DFS to capture:
+        - All links (text + href) at any depth
+        - All images (src + alt) at any depth
+        - All text content (combined)
+        - All data-* attributes from all levels
+        - All semantic classes from all levels
+        
+        Handles nested structures like: td > div > div > span > a
+        
+        Args:
+            element: HTML element to extract from
+            
+        Returns:
+            {
+                'text': 'Combined text',
+                'links': [{'text': '...', 'href': '...'}],
+                'images': [{'src': '...', 'alt': '...'}],
+                'data_attrs': {...},
+                'classes': [...]
+            }
+        """
+        result = {
+            'text': '',
+            'links': [],
+            'images': [],
+            'data_attrs': {},
+            'classes': []
+        }
+        
+        # Use DFS to visit all nodes (initialize visited set)
+        self._dfs_extract(element, result, set())
+        
+        # Get combined text (fallback if DFS didn't capture text nodes)
+        if not result['text']:
+            result['text'] = element.text(strip=True)
+        
+        return result
+    
+    def _dfs_extract(self, node, result: Dict[str, Any], visited: set = None):
+        """
+        DFS (Depth-First Search) traversal to extract ALL data from element tree.
+        
+        Recursively visits every child node and extracts:
+        - Links (a tags with href)
+        - Images (img tags with src)
+        - Text content
+        - Data attributes
+        - Classes
+        
+        Args:
+            node: Current HTML node to process
+            result: Dictionary to accumulate results
+            visited: Set of visited nodes (to avoid cycles)
+        """
+        if visited is None:
+            visited = set()
+        
+        # Avoid infinite loops (shouldn't happen with HTML, but safety first)
+        node_id = id(node)
+        if node_id in visited:
+            return
+        visited.add(node_id)
+        
+        # Extract data from current node
+        if hasattr(node, 'tag'):
+            # Process based on tag type
+            tag = node.tag.lower()
+            
+            # Extract links
+            if tag == 'a':
+                href = node.attributes.get('href', '')
+                text = node.text(strip=True)
+                if href or text:
+                    result['links'].append({
+                        'text': text,
+                        'href': href
+                    })
+            
+            # Extract images
+            elif tag == 'img':
+                src = node.attributes.get('src', '')
+                alt = node.attributes.get('alt', '')
+                if src:
+                    result['images'].append({
+                        'src': src,
+                        'alt': alt
+                    })
+            
+            # Extract text from text nodes
+            if hasattr(node, 'text'):
+                text = node.text(strip=True, deep=False)  # Only this node's text
+                if text:
+                    if result['text']:
+                        result['text'] += ' ' + text
+                    else:
+                        result['text'] = text
+            
+            # Extract data-* attributes
+            if hasattr(node, 'attributes'):
+                for attr_name, attr_value in node.attributes.items():
+                    if attr_name.startswith('data-'):
+                        result['data_attrs'][attr_name] = attr_value
+            
+            # Extract classes
+            if hasattr(node, 'attributes'):
+                class_attr = node.attributes.get('class', '')
+                if class_attr:
+                    classes = class_attr.split()
+                    for cls in classes:
+                        if cls not in result['classes']:
+                            result['classes'].append(cls)
+        
+        # Recursively process all children
+        if hasattr(node, 'iter'):
+            for child in node.iter():
+                if child != node:  # Don't re-process current node
+                    self._dfs_extract(child, result, visited)
+    
     def _extract_links(self, tree) -> List[Dict]:
         """Extract ALL links with text and href"""
         links = []
@@ -209,18 +377,33 @@ class UniversalExtractor:
         return images
     
     def _extract_tables(self, tree) -> List[Dict]:
-        """Extract ALL tables with headers and rows"""
+        """
+        Extract ALL tables with headers and rows, including nested content in cells.
+        Uses _extract_cell_content() for deep extraction of links, images, etc.
+        """
         tables = []
         
         for idx, table in enumerate(tree.css('table')):
             # Extract headers
             headers = [th.text(strip=True) for th in table.css('th')]
             
-            # Extract rows
+            # Extract rows with rich cell content
             rows = []
             for tr in table.css('tr'):
-                cells = [td.text(strip=True) for td in tr.css('td')]
-                if cells:
+                tds = tr.css('td')
+                if tds:
+                    # Extract cell content with deep traversal
+                    cells = []
+                    for td in tds:
+                        cell_data = self._extract_cell_content(td)
+                        
+                        # For backward compatibility, return href if single link exists
+                        if len(cell_data['links']) == 1 and cell_data['links'][0]['href']:
+                            cells.append(cell_data['links'][0]['href'])
+                        else:
+                            # Otherwise return text
+                            cells.append(cell_data['text'])
+                    
                     # Create dict if we have headers
                     if headers and len(headers) > 0:
                         row = {}
@@ -265,7 +448,7 @@ class UniversalExtractor:
         """Extract ALL forms with inputs"""
         forms = []
         
-        for idx, form in enumerate(tree.css('form')):
+        for idx, form in tree.css('form'):
             inputs = []
             for input_elem in form.css('input, textarea, select'):
                 inputs.append({

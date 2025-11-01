@@ -48,7 +48,8 @@ class LLMService:
                 model=self.settings.llm_model,
                 temperature=self.settings.llm_temperature,
                 google_api_key=self.settings.GEMINI_API_KEY,  # Explicitly use API key
-                max_output_tokens=2048,  # Ensure model can generate responses
+                max_output_tokens=8192,  # Maximum for Gemini 2.5 Flash
+                response_mime_type="application/json",  # Force JSON output
                 top_p=0.95,  # Add some diversity
                 top_k=40  # Limit token selection for better quality
             )

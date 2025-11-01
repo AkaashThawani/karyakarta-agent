@@ -147,6 +147,117 @@ class BaseTool(ABC):
         """
         return True
     
+    def _add_completeness_metadata(
+        self,
+        data: Any,
+        requested_count: Optional[int] = None,
+        requested_fields: Optional[list] = None,
+        task_description: Optional[str] = None,
+        truncate_long_text: bool = True,
+        max_text_length: int = 500
+    ) -> Dict[str, Any]:
+        """
+        Universal completeness metadata generator for ALL tools.
+        
+        Validates:
+        - Count: Did we get the requested number of items?
+        - Fields: Do all items have all required fields?
+        - Quality: Are fields non-empty and meaningful?
+        - Truncates long text fields (e.g., abstracts > 500 chars)
+        
+        Args:
+            data: The tool's result data (list, dict, str, etc.)
+            requested_count: Number of items user requested (e.g., "top 5")
+            requested_fields: Fields user requested (e.g., ["title", "abstract"])
+            task_description: Original task description for context
+            truncate_long_text: Whether to truncate long text fields (default: True)
+            max_text_length: Maximum length before truncation (default: 500)
+            
+        Returns:
+            Completeness metadata dict with truncation info
+        """
+        metadata = {
+            "complete": True,
+            "requested": {},
+            "received": {},
+            "coverage": 1.0,
+            "reason": "",
+            "suggested_action": None,
+            "truncated_fields": []
+        }
+        
+        # Determine actual count and fields from data
+        actual_count = 0
+        actual_fields = []
+        missing_fields = []
+        truncated_count = 0
+        
+        # Handle truncation of long text fields in data
+        if truncate_long_text and isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    for key, value in item.items():
+                        if isinstance(value, str) and len(value) > max_text_length:
+                            # Truncate long text
+                            item[key] = value[:300] + "..."
+                            truncated_count += 1
+                            if key not in metadata["truncated_fields"]:
+                                metadata["truncated_fields"].append(key)
+        
+        if isinstance(data, list) and len(data) > 0:
+            actual_count = len(data)
+            if isinstance(data[0], dict):
+                actual_fields = list(data[0].keys())
+        elif isinstance(data, dict):
+            actual_count = 1
+            actual_fields = list(data.keys())
+            # Truncate long text in single dict
+            if truncate_long_text:
+                for key, value in data.items():
+                    if isinstance(value, str) and len(value) > max_text_length:
+                        data[key] = value[:300] + "..."
+                        truncated_count += 1
+                        metadata["truncated_fields"].append(key)
+        elif isinstance(data, str):
+            # For string results, check if it's structured
+            actual_count = 1
+        
+        # Check count completeness
+        if requested_count and actual_count < requested_count:
+            metadata["complete"] = False
+            metadata["coverage"] = actual_count / requested_count
+            metadata["reason"] = f"Got {actual_count}/{requested_count} items"
+            metadata["suggested_action"] = "retry_with_pagination"
+        
+        # Check field completeness
+        if requested_fields and actual_fields:
+            missing_fields = [f for f in requested_fields if f not in actual_fields]
+            if missing_fields:
+                metadata["complete"] = False
+                metadata["reason"] = f"Missing fields: {', '.join(missing_fields)}"
+                metadata["suggested_action"] = "extract_missing_fields"
+        
+        # Store requested/received info
+        metadata["requested"] = {
+            "count": requested_count,
+            "fields": requested_fields or []
+        }
+        metadata["received"] = {
+            "count": actual_count,
+            "fields": actual_fields,
+            "missing_fields": missing_fields
+        }
+        
+        # Add truncation info
+        if truncated_count > 0:
+            metadata["truncated"] = True
+            metadata["truncated_count"] = truncated_count
+            print(f"[TRUNCATION] Truncated {truncated_count} long text fields: {metadata['truncated_fields']}")
+        else:
+            metadata["truncated"] = False
+        
+        return metadata
+    
     def format_result(self, result: ToolResult) -> str:
         """
         Format result for LLM consumption.

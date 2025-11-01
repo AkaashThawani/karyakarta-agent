@@ -110,10 +110,17 @@ class PlaywrightChartExtractor:
         self,
         page: Page,
         url: str,
-        required_fields: List[str]
+        required_fields: List[str],
+        limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Extract chart data using multi-layer approach.
+        
+        Args:
+            page: Playwright page instance
+            url: URL to extract from
+            required_fields: List of field names to extract
+            limit: Maximum number of records (enables early termination)
         
         Priority:
         1. UniversalExtractor (extract EVERYTHING, then search)
@@ -155,12 +162,9 @@ class PlaywrightChartExtractor:
             # CRITICAL: Wrap page.content() in timeout!
             html = await asyncio.wait_for(page.content(), timeout=5.0)
             
-            # Extract EVERYTHING with 30 second timeout
+            # Extract EVERYTHING with 30 second timeout and limit for early termination
             extractor = UniversalExtractor()
-            all_data = await asyncio.wait_for(
-                asyncio.to_thread(extractor.extract_everything, html, url),
-                timeout=30.0
-            )
+            all_data = await extractor.extract_everything_async(html, url, limit=limit)
             
             print(f"[EXTRACT] Extracted:")
             print(f"  - {all_data['summary']['tables_count']} tables")

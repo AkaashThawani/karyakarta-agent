@@ -12,6 +12,8 @@ from src.agents.base_agent import (
 )
 from src.prompts import get_reason_agent_prompt
 from src.routing.task_decomposer import create_decomposer
+from src.core.data_flow_resolver import get_resolver
+from datetime import datetime
 import time
 import json
 import asyncio
@@ -261,7 +263,7 @@ class ReasonAgent(BaseAgent):
     def _analyze_task_comprehensive(self, task: AgentTask) -> Optional[Dict[str, Any]]:
         """
         SINGLE comprehensive LLM call for complete task analysis.
-        Replaces 4 separate calls: query params, task type, tool selection, field extraction.
+        Uses existing tool_capabilities infrastructure for zero hardcoding.
         
         Args:
             task: Task to analyze
@@ -272,175 +274,121 @@ class ReasonAgent(BaseAgent):
         if not self.llm_service:
             return None
         
-        # Get tool descriptions for context
-        tool_descriptions = self._get_tool_descriptions()
-        if not tool_descriptions:
+        # Use existing infrastructure - load tools from registry
+        from src.routing.tool_capabilities import get_tool_registry
+        
+        tool_registry = get_tool_registry()
+        if not tool_registry:
             return None
         
-        # Build comprehensive analysis prompt
-        prompt = f"""Analyze this task comprehensively and return ALL information in one JSON response.
+        # Build compact tool list with parameter formats and examples
+        tools_str = ""
+        for name, info in tool_registry.items():
+            if name.startswith("$"):  # Skip metadata
+                continue
+            
+            desc = info.get('description', '')
+            param_format = info.get('parameter_format', {})
+            example_usage = info.get('example_usage', {})
+            usage_note = info.get('usage_note', '')
+            
+            tools_str += f"- {name}: {desc}\n"
+            
+            # Add usage note if available (for playwright_execute)
+            if usage_note:
+                tools_str += f"  Note: {usage_note}\n"
+            
+            # Add parameter format if available
+            if param_format:
+                tools_str += "  Params: "
+                params = []
+                for param_name, param_desc in param_format.items():
+                    params.append(f"{param_name}={param_desc}")
+                tools_str += "; ".join(params) + "\n"
+            
+            # Add example usage if available (for playwright_execute)
+            if example_usage:
+                tools_str += "  Examples:\n"
+                for example_name, example_obj in list(example_usage.items())[:2]:  # Show max 2 examples
+                    tools_str += f"    {example_name}: {json.dumps(example_obj)}\n"
+        
+        # Build comprehensive analysis prompt (compact, schema-driven)
+        prompt = f"""Analyze task and return JSON.
 
 Task: "{task.description}"
 
 Available Tools:
-"""
-        # Only include most relevant tools to reduce prompt size
-        relevant_tools = ["google_search", "playwright_execute", "api_call", "chart_extractor"]
-        for tool_name in relevant_tools:
-            if tool_name in tool_descriptions:
-                prompt += f"- {tool_name}: {tool_descriptions[tool_name]}\n"
-        
-        prompt += """
-Analyze and return JSON with:
+{tools_str}
 
-{
-    "task_type": "text_generation|api_request|web_scraping|search|general",
-    "query_params": {"limit": 10, "sort": "id"},  // Extract if present (e.g., "latest 10")
-    "required_tools": ["tool1", "tool2"],  // Which tools needed
-    "required_fields": ["field1", "field2"],  // What data to extract (if applicable)
-    "task_structure": {
-        "type": "sequential|parallel|single",
-        "steps": [
-            {"description": "step1 description", "tool": "tool_name"}
-        ]  // For multi-step: include tool assignment
-    }
-}
+**CRITICAL: Sequential Task Parameter Rules**
 
-Available Tools:
-- google_search: Search Google for information
-- chart_extractor: Extract structured data (tables, lists) from webpages
-- playwright_execute: Automate browser (navigate, click, fill forms)
-- api_call: Make HTTP API requests
+For multi-step tasks, the system AUTOMATICALLY passes data between steps:
+- Step 1 outputs (URLs, data, etc.) are AUTOMATICALLY available to Step 2
+- You MUST NOT include parameters in Step 2 that come from Step 1
+- The DataFlowResolver handles ALL data passing automatically
 
-Tool Selection Rules:
-- "search", "find", "identify", "look up" → google_search
-- "extract", "get data", "scrape", "table" → chart_extractor
-- "navigate", "click", "fill", "browser" → playwright_execute
-- "API", "HTTP request", "endpoint" → api_call
+**WRONG Examples (DO NOT DO THIS):**
 
-Examples:
+❌ Example 1 - Using placeholder variable:
+{{
+  "steps": [
+    {{"tool": "google_search", "parameters": {{"query": "TechCrunch AI"}}}},
+    {{"tool": "chart_extractor", "parameters": {{"url": "{{techcrunch}}"}}}}
+  ]
+}}
 
-1. "Get weather for Seattle, then suggest activity"
-{
-    "task_type": "search",
-    "query_params": {},
-    "required_tools": ["google_search"],
-    "required_fields": ["temperature", "condition", "activity_name"],
-    "task_structure": {
-        "type": "sequential",
-        "steps": [
-            {
-                "description": "Get current weather for Seattle",
-                "tool": "google_search",
-                "parameters": {"query": "weather Seattle"}
-            },
-            {
-                "description": "Suggest activity based on weather",
-                "tool": "google_search",
-                "parameters": {"query": "outdoor activities Seattle"}
-            }
-        ]
-    }
-}
+❌ Example 2 - Using PREVIOUS_STEP_RESULT:
+{{
+  "steps": [
+    {{"tool": "google_search", "parameters": {{"query": "AI news"}}}},
+    {{"tool": "chart_extractor", "parameters": {{"url": "PREVIOUS_STEP_RESULT.url"}}}}
+  ]
+}}
 
-2. "Search Amazon for phones, extract top 3 with prices"
-{
-    "task_type": "web_scraping",
-    "query_params": {"limit": 3},
-    "required_tools": ["google_search", "chart_extractor"],
-    "required_fields": ["name", "price", "rating"],
-    "task_structure": {
-        "type": "sequential",
-        "steps": [
-            {
-                "description": "Search Amazon for phones",
-                "tool": "google_search",
-                "parameters": {"query": "Amazon phones"}
-            },
-            {
-                "description": "Extract name, price, rating from results",
-                "tool": "chart_extractor",
-                "parameters": {
-                    "required_fields": ["name", "price", "rating"],
-                    "limit": 3
-                }
-            }
-        ]
-    }
-}
+❌ Example 3 - Using variable.field syntax:
+{{
+  "steps": [
+    {{"tool": "google_search", "parameters": {{"query": "news"}}}},
+    {{"tool": "chart_extractor", "parameters": {{"url": "{{search.urls[0]}}"}}}}
+  ]
+}}
 
-3. "Get latest 10 posts from API"
-{
-    "task_type": "api_request",
-    "query_params": {"limit": 10, "sort": "id", "order": "desc"},
-    "required_tools": ["api_call"],
-    "required_fields": ["id", "title", "body"],
-    "task_structure": {
-        "type": "single",
-        "steps": [
-            {
-                "description": "Get latest 10 posts from API",
-                "tool": "api_call",
-                "parameters": {
-                    "endpoint": "/posts",
-                    "method": "GET",
-                    "params": {"limit": 10, "sort": "id", "order": "desc"}
-                }
-            }
-        ]
-    }
-}
+**CORRECT Example (DO THIS):**
 
-4. "Go to eventbrite.com and search for free events"
-{
-    "task_type": "web_scraping",
-    "query_params": {"filter": "free"},
-    "required_tools": ["playwright_execute", "chart_extractor"],
-    "required_fields": ["event_name", "event_date", "event_location"],
-    "task_structure": {
-        "type": "sequential",
-        "steps": [
-            {
-                "description": "Navigate to Eventbrite website",
-                "tool": "playwright_execute",
-                "parameters": {
-                    "method": "goto",
-                    "url": "https://www.eventbrite.com"
-                }
-            },
-            {
-                "description": "Search for free events",
-                "tool": "playwright_execute",
-                "parameters": {
-                    "method": "fill",
-                    "selector_hint": "search_input",
-                    "args": {"value": "free events"}
-                }
-            },
-            {
-                "description": "Submit search",
-                "tool": "playwright_execute",
-                "parameters": {
-                    "method": "press",
-                    "selector_hint": "search_input",
-                    "args": {"key": "Enter"}
-                }
-            },
-            {
-                "description": "Extract event data",
-                "tool": "chart_extractor",
-                "parameters": {
-                    "required_fields": ["event_name", "event_date", "event_location"]
-                }
-            }
-        ]
-    }
-}
+✅ Omit the url parameter completely - system will auto-add it:
+{{
+  "steps": [
+    {{"tool": "google_search", "parameters": {{"query": "TechCrunch AI articles"}}}},
+    {{"tool": "chart_extractor", "parameters": {{"required_fields": ["headline", "author"], "limit": 5}}}}
+  ]
+}}
 
-Return ONLY valid JSON (no markdown, no explanation):"""
+**Why this works:**
+1. google_search returns URLs in its output
+2. DataFlowResolver extracts URLs from search results
+3. chart_extractor's schema says it "accepts_from": ["google_search.urls[0]"]
+4. Resolver AUTOMATICALLY adds url parameter from google_search output
+5. chart_extractor receives the actual URL without you specifying it
+
+**Rule:** If a parameter will come from a previous step, DO NOT include it in the JSON. The system handles it.
+
+Return JSON:
+{{
+    "task_type": "search|api_request|web_scraping|general",
+    "query_params": {{}},
+    "required_tools": ["tool1"],
+    "required_fields": ["field1"],
+    "task_structure": {{
+        "type": "single|sequential",
+        "steps": [{{"tool": "tool1", "parameters": {{}}}}]
+    }}
+}}
+
+RETURN ONLY VALID JSON:"""
         
         try:
             print("[REASON] 🎯 Comprehensive analysis (1 LLM call)")
+            
             model = self.llm_service.get_model()
             response = model.invoke(prompt)
             content = response.content.strip()
@@ -449,6 +397,7 @@ Return ONLY valid JSON (no markdown, no explanation):"""
             import re
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
+                print(f"[REASON] ✓ Found JSON match (length: {len(json_match.group())} chars)")
                 analysis = json.loads(json_match.group())
                 
                 # DEBUG LOGGING
@@ -849,36 +798,64 @@ Answer:"""
     
     def _keyword_based_tool_selection(self, task: AgentTask) -> List[str]:
         """
-        Fallback tool selection based on keywords in the task description.
+        Fallback tool selection using tool categories from schema.
+        ZERO HARDCODING - uses tool metadata from schema.
         
         Args:
             task: Task to analyze
             
         Returns:
-            List of tool names based on keyword matching
+            List of tool names based on schema categories
         """
+        resolver = get_resolver()
         description = task.description.lower()
         
-        # Browser automation keywords
-        browser_keywords = [
-            "go to", "goto", "navigate", "visit", "open website", "browse",
-            "click", "fill", "type", "press", "submit", "screenshot",
-            "scroll", "hover", "wait for", "extract from page"
-        ]
+        # Get all tools grouped by category from schema
+        schema_stats = resolver.get_schema_stats()
+        tools_by_category = schema_stats.get("tools_by_category", {})
         
-        # Check if this is a browser automation task
-        if any(keyword in description for keyword in browser_keywords):
-            print("[REASON] Detected browser automation request - using playwright_execute")
-            return ["playwright_execute"]
+        # Score each category based on task description
+        category_scores = {}
         
-        # Search keywords
-        search_keywords = ["search", "find", "look up", "google", "query"]
-        if any(keyword in description for keyword in search_keywords):
-            print("[REASON] Detected search request - using google_search")
-            return ["google_search"]
+        for category, tool_list in tools_by_category.items():
+            score = 0
+            
+            # Score based on category keywords
+            if category == "browser_automation":
+                keywords = ["navigate", "visit", "click", "fill", "goto", "browser", "open"]
+                score = sum(1 for kw in keywords if kw in description)
+            
+            elif category == "search":
+                keywords = ["search", "find", "look up", "google", "query"]
+                score = sum(1 for kw in keywords if kw in description)
+            
+            elif category == "extraction":
+                keywords = ["extract", "scrape", "get data", "table", "list"]
+                score = sum(1 for kw in keywords if kw in description)
+            
+            elif category == "api":
+                keywords = ["api", "endpoint", "http", "request"]
+                score = sum(1 for kw in keywords if kw in description)
+            
+            if score > 0:
+                category_scores[category] = score
         
-        # Default to search
-        print("[REASON] No specific keywords matched, defaulting to google_search")
+        # Select tools from highest scoring category
+        if category_scores:
+            best_category = max(category_scores, key=lambda cat: category_scores[cat])
+            tools = tools_by_category.get(best_category, [])
+            if tools:
+                print(f"[REASON] Fallback: Selected {tools} from category '{best_category}'")
+                return tools
+        
+        # Ultimate fallback: return first search tool
+        search_tools = tools_by_category.get("search", [])
+        if search_tools:
+            print(f"[REASON] Fallback: Defaulting to search tool: {search_tools[0]}")
+            return [search_tools[0]]
+        
+        # If all else fails, return google_search
+        print("[REASON] Fallback: Defaulting to google_search")
         return ["google_search"]
     
     def _needs_structured_extraction(self, query: str) -> bool:
@@ -1097,10 +1074,11 @@ Return ONLY valid JSON:"""
             plan["needs_follow_up_extraction"] = True
             plan["required_fields"] = required_fields
         
-        # HYBRID APPROACH: Use decomposer if we have structured steps from analysis
+        # Use decomposer if we have pre-analyzed steps (type-agnostic)
         if task_structure.get("steps"):
             num_steps = len(task_structure.get("steps", []))
-            print(f"[REASON] Found {num_steps} pre-analyzed steps, using decomposer")
+            structure_type = task_structure.get("type", "unknown")
+            print(f"[REASON] Found {num_steps} pre-analyzed steps (type: {structure_type}), using decomposer")
             
             # Pass comprehensive context to decomposer
             decomposer_context = {
@@ -1360,7 +1338,8 @@ Return ONLY valid JSON:"""
         description: str
     ) -> Dict[str, Any]:
         """
-        Map parameters correctly for each tool type.
+        Map parameters using tool schema.
+        ZERO HARDCODING - uses tool_io_schema.json.
         
         Args:
             tool_name: Name of the tool
@@ -1370,73 +1349,74 @@ Return ONLY valid JSON:"""
         Returns:
             Properly mapped parameters for the tool
         """
+        resolver = get_resolver()
+        
+        # Get tool's input schema
+        tool_inputs = resolver.get_tool_inputs(tool_name)
+        
+        if not tool_inputs:
+            # No schema, use simple fallback
+            query = base_params.get("query", description)
+            return {"query": query}
+        
+        params = {}
         query = base_params.get("query", description)
         
-        # Tool-specific parameter mapping
-        if tool_name == "google_search":
-            return {"query": query}
-        
-        elif tool_name == "playwright_execute":
-            # Extract URL from description
-            import re
-            # Match both full URLs and domain names
-            url_pattern = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?'
-            url_match = re.search(url_pattern, description)
+        # For each input in schema, try to provide a value
+        for input_name, input_spec in tool_inputs.items():
+            # Add defaults for non-required inputs
+            if not input_spec.get("required", False):
+                if "default" in input_spec:
+                    params[input_name] = input_spec["default"]
+                continue
             
-            url = None
-            if url_match:
-                url = url_match.group(0)
-                print(f"[REASON] Extracted URL (raw): {url}")
-                # Strip trailing punctuation (commas, periods, etc.)
-                url = url.rstrip(',.;:!?')
-                print(f"[REASON] After stripping punctuation: {url}")
-                # Ensure URL has protocol (check for :// to avoid matching domains like httpbin.org)
-                if not url.startswith(('http://', 'https://')):
-                    url = f'https://{url}'
-                    print(f"[REASON] Added protocol: {url}")
-                else:
-                    print(f"[REASON] Already has protocol: {url}")
+            # Map based on input name (schema-driven)
+            if input_name == "query":
+                params["query"] = query
+            elif input_name == "expression":
+                params["expression"] = query
+            elif input_name == "url":
+                # Extract URL from description
+                url = self._extract_url_from_description(description)
+                if url:
+                    params["url"] = url
+            elif input_name == "method":
+                params["method"] = "goto"
+            elif input_name == "args":
+                params["args"] = {}
+            elif input_name == "content":
+                params["content"] = ""  # Will be filled by resolver
+            elif input_name == "data_type":
+                params["data_type"] = "html"
+        
+        # If no params were set, provide minimal fallback
+        if not params:
+            params = {"query": query}
+        
+        return params
+    
+    def _extract_url_from_description(self, description: str) -> Optional[str]:
+        """
+        Extract URL from description (schema-agnostic helper).
+        
+        Args:
+            description: Task description
             
-            print(f"[REASON] Final URL for playwright: {url}")
-            
-            # For simple navigation tasks, just return goto
-            # For complex tasks, the Executor will need to handle the full description
-            return {
-                "url": url,
-                "method": "goto",
-                "args": {}
-            }
+        Returns:
+            Extracted URL or None
+        """
+        import re
+        url_pattern = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?'
+        match = re.search(url_pattern, description)
         
-        elif tool_name == "browse_website":
-            # URL will be provided by chaining from search results
-            # If not chained, try to extract from description
-            if "http" in description:
-                start = description.find("http")
-                end = description.find(" ", start)
-                if end == -1:
-                    end = len(description)
-                url = description[start:end].strip()
-                return {"url": url}
-            # If no URL available, this will be handled by chaining
-            return {"url": ""}  # Will be replaced by chaining
+        if match:
+            url = match.group(0).rstrip(',.;:!?')
+            # Ensure protocol
+            if not url.startswith(('http://', 'https://')):
+                url = f'https://{url}'
+            return url
         
-        elif tool_name == "calculator":
-            # Extract mathematical expression
-            return {"expression": query}
-        
-        elif tool_name == "extract_data":
-            # Extract_data needs content from previous tool
-            # Will be populated by chaining
-            # Use "html" type (valid: json, html, xml, csv, table)
-            return {
-                "data_type": "html",  # Valid type for text extraction
-                "content": "",  # Will be filled by chaining
-                "path": ""  # Optional XPath selector
-            }
-        
-        else:
-            # Default: pass query parameter
-            return {"query": query}
+        return None
     
     async def _execute_parallel_extraction(
         self,
@@ -1604,9 +1584,8 @@ Return ONLY valid JSON:"""
     
     def _execute_delegation(self, subtasks: List[Dict[str, Any]], plan: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
-        Actually delegate tasks to executor agents and get real results.
-        Handles sequential dependencies between tasks.
-        NOW WITH PARALLEL URL EXTRACTION!
+        Delegate tasks to executor agents with AUTOMATIC data flow resolution.
+        Uses DataFlowResolver for zero-hardcoding parameter chaining.
         
         Args:
             subtasks: List of subtasks to delegate
@@ -1615,27 +1594,34 @@ Return ONLY valid JSON:"""
         Returns:
             List of results from executors
         """
+        # Initialize DataFlowResolver for automatic data flow
+        resolver = get_resolver()
+        print("[REASON] 🔄 Using DataFlowResolver for automatic parameter resolution")
+        
         results = []
-        previous_result = None
+        accumulated_data = {}  # Track all tool outputs with structure
         
-        # NEW: Track follow-ups per tool to prevent infinite loops
+        # Track follow-ups per tool to prevent infinite loops
         MAX_FOLLOW_UPS_PER_TOOL = 5
-        follow_up_counts = {}  # {tool_name: count}
-        previous_coverage = {}  # {tool_name: coverage_percentage}
-        
-        # Track if we've already added extraction tasks
+        follow_up_counts = {}
+        previous_coverage = {}
         extraction_tasks_added = False
         
         for i, subtask in enumerate(subtasks):
-            print(f"[REASON] === Subtask {i+1}/{len(subtasks)}: {subtask['tool']} ===")
+            tool_name = subtask["tool"]
+            provided_params = subtask["parameters"]
             
-            # Update parameters based on previous result
-            if previous_result and previous_result.get("success"):
-                subtask["parameters"] = self._chain_parameters(
-                    subtask["tool"],
-                    subtask["parameters"],
-                    previous_result
-                )
+            print(f"[REASON] === Subtask {i+1}/{len(subtasks)}: {tool_name} ===")
+            
+            # AUTOMATIC INPUT RESOLUTION (replaces _chain_parameters)
+            resolved_params = resolver.resolve_inputs(
+                tool_name=tool_name,
+                provided_params=provided_params,
+                accumulated_data=accumulated_data
+            )
+            
+            # Update subtask with resolved parameters
+            subtask["parameters"] = resolved_params
             
             # Find executor agent that can handle this tool
             # print(f"[REASON] Looking for executor for tool: {subtask['tool']}")
@@ -1681,19 +1667,35 @@ Return ONLY valid JSON:"""
             # Execute through executor agent with context
             try:
                 result = executor.execute(task, context=execution_context)
-                print(f"[REASON] ✓ Subtask {i+1}/{len(subtasks)}: {subtask['tool']} - {result.success}")
+                print(f"[REASON] ✓ Subtask {i+1}/{len(subtasks)}: {tool_name} - {result.success}")
+                
+                # AUTOMATIC OUTPUT EXTRACTION (zero hardcoding)
+                extracted_outputs = resolver.extract_outputs(
+                    tool_name=tool_name,
+                    raw_result=result.data
+                )
+                
+                # Store in accumulated data with structure preservation
+                step_name = f"step_{i}_{tool_name}"
+                accumulated_data[step_name] = {
+                    "tool": tool_name,
+                    "result": result,
+                    "extracted": extracted_outputs,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                print(f"[REASON] 📦 Accumulated data: {list(extracted_outputs.keys())}")
                 
                 result_entry = {
                     "subtask_id": subtask["subtask_id"],
-                    "tool": subtask["tool"],
+                    "tool": tool_name,
                     "success": result.success,
                     "data": result.data,
                     "metadata": result.metadata
                 }
                 results.append(result_entry)
-                previous_result = result_entry
                 
-                self.log(f"Subtask completed: {subtask['tool']} - Success: {result.success}")
+                self.log(f"Subtask completed: {tool_name} - Success: {result.success}")
                 
                 # NEW: Auto-extraction after search completes WITH PARALLEL EXECUTION!
                 # Only run if NO explicit extraction tool in plan
@@ -1852,78 +1854,6 @@ Return ONLY valid JSON:"""
                 previous_result = result_entry
         
         return results
-    
-    def _chain_parameters(
-        self,
-        tool_name: str,
-        current_params: Dict[str, Any],
-        previous_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Chain parameters from previous result to current tool.
-        
-        Args:
-            tool_name: Current tool name
-            current_params: Current parameters
-            previous_result: Result from previous tool
-            
-        Returns:
-            Updated parameters
-        """
-        # If browse_website follows search, use first URL from search
-        if tool_name == "browse_website" and previous_result.get("tool") == "google_search":
-            data = previous_result.get("data", "")
-            
-            # Better URL extraction - look for URLs with common TLDs
-            import re
-            # Pattern to match URLs (simplified)
-            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-            urls = re.findall(url_pattern, data)
-            
-            if urls:
-                # Filter out common non-content URLs
-                filtered_urls = [
-                    url for url in urls 
-                    if not any(skip in url.lower() for skip in [
-                        'google.com', 'youtube.com', 'facebook.com',
-                        'twitter.com', 'linkedin.com', 'instagram.com',
-                        'example.com', 'wikipedia.org/wiki/Main_Page'
-                    ])
-                ]
-                
-                # Use first filtered URL or first URL if no filter matches
-                selected_url = filtered_urls[0] if filtered_urls else urls[0]
-                # Clean up URL (remove trailing punctuation)
-                selected_url = selected_url.rstrip('.,;:!?')
-                
-                current_params["url"] = selected_url
-                self.log(f"Chained URL from search: {selected_url}")
-            else:
-                self.log("No URL found in search results", level="warning")
-        
-        # If extract_data follows browse_website, use scraped content
-        elif tool_name == "extract_data" and previous_result.get("tool") == "browse_website":
-            data = previous_result.get("data", "")
-            if data:
-                current_params["content"] = data
-                # Use "html" type - valid for extract_data (json, html, xml, csv, table)
-                current_params["data_type"] = "html"
-                self.log(f"Chained content from browse ({len(data)} chars)")
-            else:
-                self.log("No content from browse_website", level="warning")
-        
-        # If extract_data follows google_search (no browse in between), use search results
-        elif tool_name == "extract_data" and previous_result.get("tool") == "google_search":
-            data = previous_result.get("data", "")
-            if data:
-                current_params["content"] = data
-                # Use "html" type for text content
-                current_params["data_type"] = "html"
-                self.log(f"Chained content from search ({len(data)} chars)")
-            else:
-                self.log("No content from google_search", level="warning")
-        
-        return current_params
     
     def _find_executor_for_tool(self, tool_name: str) -> Optional[Any]:
         """

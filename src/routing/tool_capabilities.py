@@ -13,15 +13,27 @@ import os
 def load_tool_registry() -> Dict[str, Dict[str, Any]]:
     """
     Load tool registry from JSON file.
+    Filters out disabled tools (those with enabled=false or starting with _).
     
     Returns:
-        dict: Complete tool registry
+        dict: Tool registry with only enabled tools
     """
     registry_path = os.path.join(os.path.dirname(__file__), "..", "..", "tool_registry.json")
     
     try:
         with open(registry_path, 'r') as f:
-            return json.load(f)
+            full_registry = json.load(f)
+        
+        # Filter out disabled tools and metadata entries
+        enabled_registry = {
+            name: data 
+            for name, data in full_registry.items() 
+            if isinstance(data, dict) and data.get("enabled", True) and not name.startswith("_") and not name.startswith("$")
+        }
+        
+        print(f"[REGISTRY] Loaded {len(enabled_registry)}/{len(full_registry)} enabled tools")
+        return enabled_registry
+        
     except FileNotFoundError:
         print(f"[REGISTRY] Warning: tool_registry.json not found at {registry_path}")
         print("[REGISTRY] Falling back to static registry")

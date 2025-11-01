@@ -5,6 +5,7 @@ Uses new AgentManager or MultiAgentManager based on configuration.
 Provides backward-compatible interface for API routes.
 """
 
+from typing import Dict, Any
 from dotenv import load_dotenv
 
 # Import modular components
@@ -51,6 +52,10 @@ memory_service = get_memory_service("data/conversations.db")
 
 # Global manager instance
 _agent_manager = None
+
+# Global task tracking for cancellation
+active_tasks: Dict[str, Any] = {}
+cancellation_flags: Dict[str, bool] = {}
 
 # Configuration: Set to True to enable multi-agent system
 USE_MULTI_AGENT_SYSTEM = True  # Change to False for classic mode
@@ -206,61 +211,139 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     """
     import asyncio
     import signal
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
     
     print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
     print(f"[AgentLogic] Mode: {'Multi-Agent' if USE_MULTI_AGENT_SYSTEM else 'Classic'}")
     
-    # Set up timeout and cancellation handling
+    # Initialize cancellation flag for this task
+    cancellation_flags[message_id] = False
+    
+    # Increased timeout to 300 seconds (5 minutes) to prevent premature timeouts
+    TASK_TIMEOUT = 300.0
+    
+    # Set up timeout and cancellation handling with proper cleanup
     async def execute_with_timeout():
+        task = None
+        executor = ThreadPoolExecutor(max_workers=1)
+        
         try:
             # Get the global manager instance
             manager = get_agent_manager()
             
-            # Wrap execution in 120 second timeout
+            # Create a proper asyncio task instead of using to_thread
+            # This allows proper cancellation
             try:
                 if isinstance(manager, MultiAgentManager):
                     # Use multi-agent execution
-                    result = await asyncio.wait_for(
+                    task = asyncio.create_task(
                         asyncio.to_thread(
                             manager.execute_task_multi_agent,
                             prompt=prompt,
                             message_id=message_id,
                             session_id=session_id,
                             use_reason_agent=True
-                        ),
-                        timeout=120.0
+                        )
                     )
                 else:
                     # Use classic execution
-                    result = await asyncio.wait_for(
+                    task = asyncio.create_task(
                         asyncio.to_thread(
                             manager.execute_task,
                             prompt=prompt,
                             message_id=message_id,
                             session_id=session_id
-                        ),
-                        timeout=120.0
+                        )
                     )
+                
+                # Store task reference for cancellation
+                active_tasks[message_id] = task
+                
+                # Wait for task with timeout
+                result = await asyncio.wait_for(task, timeout=TASK_TIMEOUT)
+                
+                # Clean up task reference on completion
+                if message_id in active_tasks:
+                    del active_tasks[message_id]
+                if message_id in cancellation_flags:
+                    del cancellation_flags[message_id]
                 
                 print(f"[AgentLogic] Task completed successfully")
                 return result
                 
             except asyncio.TimeoutError:
-                error_msg = "Task execution timeout after 120 seconds"
+                error_msg = f"Task execution timeout after {TASK_TIMEOUT} seconds"
                 logger.error(error_msg, message_id)
                 logger.status(f"❌ {error_msg}")
                 print(f"[AgentLogic] {error_msg}")
-                return f"Error: {error_msg}"
+                
+                # CRITICAL: Cancel the task to stop the thread
+                if task and not task.done():
+                    print(f"[AgentLogic] Cancelling running task...")
+                    task.cancel()
+                    try:
+                        await asyncio.wait_for(task, timeout=5.0)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        print(f"[AgentLogic] Task cancellation timed out or was cancelled")
+                
+                # Cleanup Playwright browsers for this session
+                print(f"[AgentLogic] Cleaning up resources for session: {session_id}")
+                try:
+                    from src.tools.playwright_universal import UniversalPlaywrightTool
+                    await UniversalPlaywrightTool.cleanup_session(session_id)
+                except Exception as cleanup_error:
+                    print(f"[AgentLogic] Cleanup error: {cleanup_error}")
+                
+                # Clean up tracking
+                if message_id in active_tasks:
+                    del active_tasks[message_id]
+                if message_id in cancellation_flags:
+                    del cancellation_flags[message_id]
+                
+                return f"Error: {error_msg}. The task took too long and was cancelled. Please try a simpler query or break it into smaller steps."
                 
         except asyncio.CancelledError:
-            print(f"[AgentLogic] Task cancelled")
+            print(f"[AgentLogic] Task cancelled by user")
             logger.status("❌ Task cancelled by user")
-            raise
+            
+            # Cleanup on cancellation
+            if task and not task.done():
+                task.cancel()
+            
+            # Cleanup Playwright resources
+            try:
+                from src.tools.playwright_universal import UniversalPlaywrightTool
+                await UniversalPlaywrightTool.cleanup_session(session_id)
+            except Exception as cleanup_error:
+                print(f"[AgentLogic] Cleanup error: {cleanup_error}")
+            
+            # Clean up tracking
+            if message_id in active_tasks:
+                del active_tasks[message_id]
+            if message_id in cancellation_flags:
+                del cancellation_flags[message_id]
+            
+            return "Task cancelled by user"
         except Exception as e:
             error_msg = f"An error occurred during agent execution: {e}"
             logger.error(error_msg, message_id)
             print(f"[AgentLogic] Error: {e}")
+            
+            # Cleanup on error
+            if task and not task.done():
+                task.cancel()
+            
+            # Clean up tracking
+            if message_id in active_tasks:
+                del active_tasks[message_id]
+            if message_id in cancellation_flags:
+                del cancellation_flags[message_id]
+            
             return f"Error: {e}"
+        finally:
+            # Shutdown executor
+            executor.shutdown(wait=False)
     
     # Run with asyncio
     try:
@@ -295,3 +378,50 @@ def enable_classic_mode():
 def get_current_mode():
     """Get current execution mode."""
     return "Multi-Agent" if USE_MULTI_AGENT_SYSTEM else "Classic"
+
+
+def cancel_task(message_id: str) -> Dict[str, str]:
+    """
+    Cancel a running task by message ID.
+    
+    Args:
+        message_id: The message ID of the task to cancel
+        
+    Returns:
+        Dictionary with status and message
+    """
+    import asyncio
+    
+    print(f"[AgentLogic] Cancellation requested for message: {message_id}")
+    
+    if message_id not in active_tasks:
+        print(f"[AgentLogic] Task {message_id} not found in active tasks")
+        return {
+            "status": "not_found",
+            "message": f"Task {message_id} not found or already completed"
+        }
+    
+    # Set cancellation flag
+    cancellation_flags[message_id] = True
+    
+    # Get the task
+    task = active_tasks.get(message_id)
+    
+    if task and not task.done():
+        # Cancel the asyncio task
+        task.cancel()
+        print(f"[AgentLogic] Task {message_id} cancellation initiated")
+        
+        # Log the cancellation
+        logger.status(f"🛑 Task cancelled by user", message_id)
+        
+        return {
+            "status": "cancelled",
+            "message": f"Task {message_id} has been cancelled"
+        }
+    else:
+        print(f"[AgentLogic] Task {message_id} already completed or not running")
+        return {
+            "status": "already_completed",
+            "message": f"Task {message_id} has already completed"
+        }

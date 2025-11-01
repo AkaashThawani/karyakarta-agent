@@ -147,6 +147,69 @@ class UniversalPlaywrightTool(BaseTool):
         
         print("[PLAYWRIGHT] All event loops stopped")
     
+    @classmethod
+    async def cleanup_session(cls, session_id: str):
+        """
+        Cleanup all resources for a specific session.
+        Called when a task times out or is cancelled.
+        
+        Args:
+            session_id: Session ID to cleanup
+        """
+        print(f"[PLAYWRIGHT] Cleaning up session: {session_id}")
+        
+        try:
+            # Close browser if exists
+            browser = cls._browser_instances.get(session_id)
+            if browser:
+                try:
+                    print(f"[PLAYWRIGHT] Closing browser for session: {session_id}")
+                    await asyncio.wait_for(browser.close(), timeout=5.0)
+                    print(f"[PLAYWRIGHT] ✅ Browser closed: {session_id}")
+                except asyncio.TimeoutError:
+                    print(f"[PLAYWRIGHT] ⚠️ Browser close timeout: {session_id}")
+                except Exception as e:
+                    print(f"[PLAYWRIGHT] Error closing browser: {e}")
+            
+            # Stop playwright instance
+            playwright = cls._playwright_instances.get(session_id)
+            if playwright:
+                try:
+                    print(f"[PLAYWRIGHT] Stopping Playwright for session: {session_id}")
+                    await playwright.stop()
+                    print(f"[PLAYWRIGHT] ✅ Playwright stopped: {session_id}")
+                except Exception as e:
+                    print(f"[PLAYWRIGHT] Error stopping Playwright: {e}")
+            
+            # Stop event loop
+            if session_id in cls._stop_flags:
+                cls._stop_flags[session_id] = True
+                print(f"[PLAYWRIGHT] Signaled event loop stop: {session_id}")
+            
+            # Wait for thread to finish (with timeout)
+            thread = cls._loop_threads.get(session_id)
+            if thread and thread.is_alive():
+                thread.join(timeout=2.0)
+                if not thread.is_alive():
+                    print(f"[PLAYWRIGHT] ✅ Thread stopped: {session_id}")
+                else:
+                    print(f"[PLAYWRIGHT] ⚠️ Thread didn't stop: {session_id}")
+            
+            # Clear all references
+            cls._browser_instances.pop(session_id, None)
+            cls._page_instances.pop(session_id, None)
+            cls._playwright_instances.pop(session_id, None)
+            cls._event_loops.pop(session_id, None)
+            cls._loop_threads.pop(session_id, None)
+            cls._stop_flags.pop(session_id, None)
+            
+            print(f"[PLAYWRIGHT] ✅ Session cleanup complete: {session_id}")
+            
+        except Exception as e:
+            print(f"[PLAYWRIGHT] Error during session cleanup: {e}")
+            import traceback
+            traceback.print_exc()
+    
     @property
     def _browser(self):
         return UniversalPlaywrightTool._browser_instances.get(self.session_id)
@@ -785,7 +848,7 @@ class UniversalPlaywrightTool(BaseTool):
         
         # Navigate to URL
         await self._page.goto(url)
-        await self._page.wait_for_load_state("networkidle")
+        await self._page.wait_for_load_state("domcontentloaded")
         
         # Extract using chart extractor
         extractor = PlaywrightChartExtractor()

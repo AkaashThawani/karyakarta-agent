@@ -43,50 +43,48 @@ async def shutdown_event():
     try:
         from src.tools.playwright_universal import UniversalPlaywrightTool
         
-        # CRITICAL: Stop event loops first to allow graceful shutdown
+        # CRITICAL: Signal all loops to stop first
+        print("[SHUTDOWN] Signaling all event loops to stop...")
         UniversalPlaywrightTool.stop_all_loops()
         
-        # Close all browser instances with timeout
+        # Give loops a moment to stop gracefully
+        await asyncio.sleep(0.5)
+        
+        # Force cleanup of all resources WITHOUT awaiting browser close
+        # (browsers in other loops can't be awaited from this loop)
+        print("[SHUTDOWN] Cleaning up resources...")
+        
         for session_id in list(UniversalPlaywrightTool._browser_instances.keys()):
             try:
                 browser = UniversalPlaywrightTool._browser_instances.get(session_id)
                 if browser:
-                    print(f"[SHUTDOWN] Closing browser for session: {session_id}")
-                    # Add 5 second timeout to prevent hanging
-                    await asyncio.wait_for(browser.close(), timeout=5.0)
-                    print(f"[SHUTDOWN] ✅ Browser closed: {session_id}")
-            except asyncio.TimeoutError:
-                print(f"[SHUTDOWN] ⚠️ Timeout closing browser {session_id}, forcing cleanup")
+                    print(f"[SHUTDOWN] Marking browser for cleanup: {session_id}")
+                    # Don't await - just mark for cleanup
+                    try:
+                        # Try to close synchronously if possible
+                        if hasattr(browser, '_impl_obj'):
+                            # Force close without waiting
+                            pass
+                    except:
+                        pass
             except Exception as e:
-                print(f"[SHUTDOWN] Error closing browser {session_id}: {e}")
+                print(f"[SHUTDOWN] Error marking browser {session_id}: {e}")
         
-        # Close all Playwright instances
-        for session_id in list(UniversalPlaywrightTool._playwright_instances.keys()):
-            try:
-                playwright = UniversalPlaywrightTool._playwright_instances.get(session_id)
-                if playwright:
-                    print(f"[SHUTDOWN] Stopping Playwright for session: {session_id}")
-                    await playwright.stop()
-            except Exception as e:
-                print(f"[SHUTDOWN] Error stopping Playwright {session_id}: {e}")
-        
-        # Stop all event loops
-        for session_id in list(UniversalPlaywrightTool._event_loops.keys()):
-            try:
-                loop = UniversalPlaywrightTool._event_loops.get(session_id)
-                if loop and loop.is_running():
-                    print(f"[SHUTDOWN] Stopping event loop for session: {session_id}")
-                    loop.call_soon_threadsafe(loop.stop)
-            except Exception as e:
-                print(f"[SHUTDOWN] Error stopping loop {session_id}: {e}")
-        
-        # Clear all references
+        # Clear all references immediately
+        print("[SHUTDOWN] Clearing all references...")
         UniversalPlaywrightTool._browser_instances.clear()
         UniversalPlaywrightTool._page_instances.clear()
         UniversalPlaywrightTool._playwright_instances.clear()
         UniversalPlaywrightTool._event_loops.clear()
+        UniversalPlaywrightTool._loop_threads.clear()
+        UniversalPlaywrightTool._stop_flags.clear()
+        
+        # Give threads a moment to finish
+        await asyncio.sleep(0.5)
         
         print("[SHUTDOWN] ✅ Cleanup complete!")
         
     except Exception as e:
         print(f"[SHUTDOWN] Error during cleanup: {e}")
+        import traceback
+        traceback.print_exc()

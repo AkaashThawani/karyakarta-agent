@@ -151,10 +151,11 @@ OUTPUT: Formatted, relevant search results"""
         Execute Google search with formatting and compression.
         
         Args:
-            **kwargs: May contain 'query', 'num_results'
+            **kwargs: May contain 'query', 'num_results', 'requested_count', 
+                     'requested_fields', 'task_description'
             
         Returns:
-            ToolResult with formatted search results
+            ToolResult with formatted search results and completeness metadata
         """
         # Handle nested kwargs from LangChain
         if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
@@ -163,6 +164,11 @@ OUTPUT: Formatted, relevant search results"""
         # Get parameters
         query = kwargs.get("query") or kwargs.get("q")
         num_results = kwargs.get("num_results", 10)
+        
+        # Extract completeness validation parameters
+        requested_count = kwargs.get("requested_count")
+        requested_fields = kwargs.get("requested_fields")
+        task_description = kwargs.get("task_description")
         
         # Handle case where query might be passed as the only argument
         if not query and len(kwargs) == 1:
@@ -204,6 +210,24 @@ OUTPUT: Formatted, relevant search results"""
             reduction_pct = (1 - len(formatted_result)/len(raw_result_str)) * 100
             print(f"[SEARCH] Size reduction: {reduction_pct:.1f}%")
             
+            # Extract actual result count from formatted results
+            actual_count = formatted_result.count('\n\n') if formatted_result else 0
+            
+            # Add completeness metadata
+            completeness_metadata = self._add_completeness_metadata(
+                data=formatted_result,
+                requested_count=requested_count or num_results,
+                requested_fields=requested_fields,
+                task_description=task_description
+            )
+            
+            # Log completeness status
+            if not completeness_metadata.get("complete", True):
+                print(f"[SEARCH] ⚠️ INCOMPLETE: {completeness_metadata.get('reason')}")
+                print(f"[SEARCH] Coverage: {completeness_metadata.get('coverage', 0):.0%}")
+            else:
+                print(f"[SEARCH] ✓ Complete")
+            
             if self.logger:
                 self.logger.status("Google search completed")
             
@@ -214,7 +238,8 @@ OUTPUT: Formatted, relevant search results"""
                     "query": query,
                     "num_results": num_results,
                     "original_size": len(raw_result),
-                    "formatted_size": len(formatted_result)
+                    "formatted_size": len(formatted_result),
+                    **completeness_metadata
                 }
             )
             
