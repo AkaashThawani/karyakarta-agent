@@ -316,57 +316,6 @@ class AgentManager:
         }
 
 
-class SimpleAgentManager:
-    """
-    Simplified agent manager without session management.
-    
-    Useful for stateless interactions or testing.
-    """
-    
-    def __init__(self, llm_service: LLMService, tools: List[BaseTool]):
-        """
-        Initialize simple agent manager.
-        
-        Args:
-            llm_service: Service for LLM interactions
-            tools: List of tools available to the agent
-        """
-        self.llm_service = llm_service
-        self.tools = tools
-        self.langchain_tools = [tool.as_langchain_tool() for tool in tools]
-    
-    def execute(self, prompt: str) -> str:
-        """
-        Execute a single query without session management.
-        
-        Args:
-            prompt: User query
-            
-        Returns:
-            str: Agent response
-        """
-        from src.core.graph import create_simple_workflow
-        from langchain_core.messages import HumanMessage, AIMessage
-        
-        # Get model with tools
-        model = self.llm_service.get_model_with_tools(self.langchain_tools)
-        
-        # Create stateless workflow
-        workflow = create_simple_workflow(self.langchain_tools, model)
-        
-        # Execute
-        result = workflow.invoke({"messages": [HumanMessage(content=prompt)]})
-        
-        # Extract answer
-        messages = result.get('messages', [])
-        if messages:
-            last_message = messages[-1]
-            if isinstance(last_message, AIMessage) and hasattr(last_message, 'content'):
-                return str(last_message.content)
-        
-        return "No response generated"
-
-
 class MultiAgentManager(AgentManager):
     """
     Extended Agent Manager with multi-agent system support.

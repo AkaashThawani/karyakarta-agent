@@ -16,32 +16,16 @@ from src.services.llm_service import LLMService
 from src.core.memory import get_memory_service
 from src.routing import RoutingStrategy
 
-# Import tools
+# Import tools that actually exist
 from src.tools.search import SearchTool
-from src.tools.scraper import ScraperTool
 from src.tools.calculator import CalculatorTool
-from src.tools.extractor import ExtractorTool
-from src.tools.list_tools import ListToolsTool
 from src.tools.chunk_reader import GetNextChunkTool
-
-# Import new advanced tools
-from src.tools.extract_structured import ExtractStructuredTool
-from src.tools.extract_advanced import (
-    ExtractTableTool, ExtractLinksTool, ExtractImagesTool, ExtractTextBlocksTool
-)
-from src.tools.browse_advanced import (
-    BrowseAndWaitTool, BrowseWithScrollTool, BrowseWithClickTool
-)
-from src.tools.browse_forms import (
-    BrowseWithFormTool, BrowseWithAuthTool, BrowseMultiPageTool
-)
 from src.tools.analysis_tools import (
     AnalyzeSentimentTool, SummarizeContentTool, CompareDataTool, ValidateDataTool
 )
 from src.tools.playwright_universal import UniversalPlaywrightTool
 from src.tools.chart_extractor_tool import ChartExtractorTool
 from src.tools.api_call import APICallTool
-from src.tools.excel_export import ExcelExportTool, CSVExportTool
 
 load_dotenv()
 
@@ -107,29 +91,10 @@ def create_tools_for_session(session_id: str):
     Returns:
         List of tool instances
     """
-    # Initialize base tools
+    # Initialize base tools that exist
     search_tool = SearchTool(logger)
-    scraper_tool = ScraperTool(session_id, logger, settings)
     calculator_tool = CalculatorTool(logger)
-    extractor_tool = ExtractorTool(logger)
     chunk_reader_tool = GetNextChunkTool(session_id, logger)
-    
-    # Initialize extraction tools
-    extract_structured_tool = ExtractStructuredTool(session_id, logger, settings)
-    extract_table_tool = ExtractTableTool(session_id, logger, settings)
-    extract_links_tool = ExtractLinksTool(session_id, logger, settings)
-    extract_images_tool = ExtractImagesTool(session_id, logger, settings)
-    extract_text_blocks_tool = ExtractTextBlocksTool(session_id, logger, settings)
-    
-    # Initialize advanced browsing tools
-    browse_and_wait_tool = BrowseAndWaitTool(session_id, logger, settings)
-    browse_with_scroll_tool = BrowseWithScrollTool(session_id, logger, settings)
-    browse_with_click_tool = BrowseWithClickTool(session_id, logger, settings)
-    
-    # Initialize form and navigation tools
-    browse_with_form_tool = BrowseWithFormTool(session_id, logger, settings)
-    browse_with_auth_tool = BrowseWithAuthTool(session_id, logger, settings)
-    browse_multi_page_tool = BrowseMultiPageTool(session_id, logger, settings)
     
     # Initialize analysis tools
     analyze_sentiment_tool = AnalyzeSentimentTool(session_id, logger, settings, llm_service)
@@ -146,31 +111,12 @@ def create_tools_for_session(session_id: str):
     # Initialize API Call Tool
     api_call_tool = APICallTool()
     
-    # Initialize Export Tools
-    excel_export_tool = ExcelExportTool(session_id, logger)
-    csv_export_tool = CSVExportTool(session_id, logger)
-    
     # Create list of all tools
     all_tools = [
         # Base tools
         search_tool,
-        scraper_tool,
         calculator_tool,
-        extractor_tool,
         chunk_reader_tool,
-        # Extraction tools
-        extract_structured_tool,
-        extract_table_tool,
-        extract_links_tool,
-        extract_images_tool,
-        extract_text_blocks_tool,
-        # Browsing tools
-        browse_and_wait_tool,
-        browse_with_scroll_tool,
-        browse_with_click_tool,
-        browse_with_form_tool,
-        browse_with_auth_tool,
-        browse_multi_page_tool,
         # Analysis tools
         analyze_sentiment_tool,
         summarize_content_tool,
@@ -182,16 +128,10 @@ def create_tools_for_session(session_id: str):
         chart_extractor_tool,
         # API Call Tool (HTTP requests for APIs)
         api_call_tool,
-        # Export Tools (Excel/CSV export)
-        excel_export_tool,
-        csv_export_tool
     ]
     
-    # Initialize list_tools meta-tool
-    list_tools_tool = ListToolsTool(all_tools, logger)
-    
-    # Return all tools including meta-tool
-    return all_tools + [list_tools_tool]
+    # Return all tools
+    return all_tools
 
 
 def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):

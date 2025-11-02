@@ -91,8 +91,6 @@ class ExecutorAgent(BaseAgent):
         """
         start_time = time.time()
         self.state.update_status(AgentStatus.EXECUTING)
-        # print(f"[EXECUTOR] Starting execution of task: {task.task_type}")
-        # print(f"[EXECUTOR] Task parameters: {task.parameters}")
         self.log(f"Executor agent executing task: {task.task_type}")
         
         try:

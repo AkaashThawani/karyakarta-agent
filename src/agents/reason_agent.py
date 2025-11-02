@@ -1624,8 +1624,6 @@ Return ONLY valid JSON:"""
             subtask["parameters"] = resolved_params
             
             # Find executor agent that can handle this tool
-            # print(f"[REASON] Looking for executor for tool: {subtask['tool']}")
-            # print(f"[REASON] Available executors: {len(self.executor_agents)}")
             executor = self._find_executor_for_tool(subtask["tool"])
             
             if not executor:
@@ -1641,9 +1639,6 @@ Return ONLY valid JSON:"""
                 previous_result = result_entry
                 continue
             
-            # print(f"[REASON] Found executor: {executor.agent_id}")
-            # print(f"[REASON] Executor has tools: {executor.get_available_tools()}")
-            
             # Create AgentTask for the executor
             task = AgentTask(
                 task_type=subtask["tool"],
@@ -1651,9 +1646,6 @@ Return ONLY valid JSON:"""
                 parameters=subtask["parameters"],
                 priority=TaskPriority.HIGH
             )
-            
-            # print(f"[REASON] Created task for executor: {task.task_type}")
-            # print(f"[REASON] Task parameters: {task.parameters}")
             
             # NEW: Build context to pass to executor
             execution_context = {
