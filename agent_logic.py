@@ -320,18 +320,58 @@ def get_current_mode():
     return "Multi-Agent" if USE_MULTI_AGENT_SYSTEM else "Classic"
 
 
-def cancel_task(message_id: str) -> Dict[str, str]:
+def cancel_task(message_id: str = None) -> Dict[str, Any]:
     """
-    Cancel a running task by message ID.
+    Cancel running task(s).
     
     Args:
-        message_id: The message ID of the task to cancel
+        message_id: The message ID of the task to cancel. If None or "all", cancels ALL active tasks.
         
     Returns:
         Dictionary with status and message
     """
     import asyncio
     
+    # If no message_id provided, cancel ALL active tasks
+    if message_id is None or message_id == "all":
+        print(f"[AgentLogic] Cancellation requested for ALL active tasks")
+        
+        if not active_tasks:
+            print(f"[AgentLogic] No active tasks to cancel")
+            return {
+                "status": "no_tasks",
+                "message": "No active tasks to cancel"
+            }
+        
+        # Cancel all tasks
+        cancelled_count = 0
+        task_ids = list(active_tasks.keys())
+        
+        for task_id in task_ids:
+            # Set cancellation flag
+            cancellation_flags[task_id] = True
+            
+            # Get the task
+            task = active_tasks.get(task_id)
+            
+            if task and not task.done():
+                # Cancel the asyncio task
+                task.cancel()
+                cancelled_count += 1
+                print(f"[AgentLogic] Task {task_id} cancelled")
+                
+                # Log the cancellation
+                logger.status(f"🛑 Task cancelled by user", task_id)
+        
+        print(f"[AgentLogic] Cancelled {cancelled_count} active task(s)")
+        
+        return {
+            "status": "cancelled",
+            "message": f"Cancelled {cancelled_count} active task(s)",
+            "cancelled_count": cancelled_count
+        }
+    
+    # Cancel specific task by message_id
     print(f"[AgentLogic] Cancellation requested for message: {message_id}")
     
     if message_id not in active_tasks:

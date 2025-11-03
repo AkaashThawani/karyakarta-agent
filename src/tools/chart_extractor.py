@@ -154,16 +154,31 @@ class PlaywrightChartExtractor:
         
         print(f"[EXTRACT] ✅ Page ready, starting extraction")
         
-        # NEW: Step 0 - Try UniversalExtractor first!
-        print(f"[EXTRACT] 🚀 Trying UniversalExtractor (extract everything, then search)...")
+        # NEW: Step 0 - Try UniversalExtractor with tree-based method first!
+        print(f"[EXTRACT] 🌳 Trying tree-based extraction (BFS+DFS+flattening)...")
         try:
             from src.tools.universal_extractor import UniversalExtractor, SmartSearcher
             
             # CRITICAL: Wrap page.content() in timeout!
             html = await asyncio.wait_for(page.content(), timeout=5.0)
             
-            # Extract EVERYTHING with 30 second timeout and limit for early termination
+            # NEW: Use tree-based extraction with global limit and required fields
             extractor = UniversalExtractor()
+            
+            # Try tree-based extraction first (more accurate with global limit)
+            tree_records = extractor.extract_with_tree_structure(
+                html=html,
+                limit=limit or 10,
+                required_fields=required_fields
+            )
+            
+            if tree_records and len(tree_records) >= 3:
+                print(f"[EXTRACT] ✅ Tree-based extraction found {len(tree_records)} records!")
+                return tree_records
+            
+            print(f"[EXTRACT] Tree-based found {len(tree_records)} records, trying legacy method...")
+            
+            # Fallback to legacy extraction
             all_data = await extractor.extract_everything_async(html, url, limit=limit)
             
             print(f"[EXTRACT] Extracted:")

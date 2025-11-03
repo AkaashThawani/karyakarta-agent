@@ -1997,6 +1997,36 @@ JSON:"""
                     error_msg += f"- {r['tool']}: {r.get('error', 'Unknown error')}\n"
             return error_msg
         
+        # NEW: Option 2 - Skip LLM synthesis for structured data
+        # Check ALL results for structured data first
+        all_structured_data = []
+        for result in successful_results:
+            data = result.get("data")
+            if isinstance(data, list) and data and all(isinstance(item, dict) for item in data):
+                all_structured_data.extend(data)
+        
+        # If we found ANY structured data, format it as markdown table for UI
+        if all_structured_data:
+            print(f"[REASON] ✅ Found {len(all_structured_data)} structured records, formatting as table")
+            
+            # Get all unique field names
+            all_fields = set()
+            for record in all_structured_data:
+                all_fields.update(record.keys())
+            
+            # Sort fields for consistent column order
+            fields = sorted(all_fields)
+            
+            # Create markdown table
+            markdown = "| " + " | ".join(fields) + " |\n"
+            markdown += "| " + " | ".join(["---" for _ in fields]) + " |\n"
+            
+            for record in all_structured_data:
+                row_values = [str(record.get(field, "")) for field in fields]
+                markdown += "| " + " | ".join(row_values) + " |\n"
+            
+            return markdown
+        
         # Use LLM to synthesize results intelligently
         print("[REASON] Using LLM to synthesize final answer...")
         self.log("Using LLM to synthesize final answer...")

@@ -23,6 +23,529 @@ import time
 class UniversalExtractor:
     """Extract EVERYTHING from HTML - no element left behind! With streaming parallel processing!"""
     
+    def __init__(self):
+        """Initialize with caching for performance"""
+        self._fingerprint_cache = {}
+        self._similarity_cache = {}
+    
+    def extract_with_tree_structure(self, html: str, limit: int = 5, required_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Synchronous wrapper for tree-based extraction.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self.extract_with_tree_structure_async(html, limit, required_fields))
+    
+    async def extract_with_tree_structure_async(self, html: str, limit: int = 5, required_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Tree-based extraction with BFS discovery + DFS extraction + flattening + BATCH STREAMING.
+        
+        Flow:
+        1. Adaptive BFS: Discover candidate nodes
+        2. Fingerprinting: Fast structural comparison
+        3. Pattern Detection: Find repeated sibling groups
+        4. DFS Extraction: Deep extraction from each candidate
+        5. Progressive Flattening: Convert tree to flat records
+        6. BATCH STREAMING: Process and yield results in batches
+        7. Deduplication: Remove duplicates
+        8. Global Limit: Return exactly N records
+        
+        Args:
+            html: HTML string to parse
+            limit: Maximum number of records to extract
+            required_fields: Optional list of required field names
+            
+        Returns:
+            List of flat records with exactly 'limit' items
+        """
+        tree = HTMLParser(html)
+        print(f"[EXTRACT] 🌳 Tree-based extraction: limit={limit}")
+        
+        try:
+            # Option A: Add 30-second timeout to prevent hanging on complex sites
+            async with asyncio.timeout(30):
+                # 1. Calculate adaptive depth
+                max_depth = await asyncio.to_thread(self._calculate_adaptive_depth, tree)
+                print(f"[EXTRACT] Adaptive max_depth: {max_depth}")
+                
+                # 2. BFS Discovery
+                levels = await asyncio.to_thread(self._bfs_discover_candidates, tree, max_depth)
+                print(f"[EXTRACT] Discovered {len(levels)} levels")
+                
+                # 3. Pattern Detection with caching
+                patterns = await asyncio.to_thread(self._detect_patterns_with_cache, levels)
+                print(f"[EXTRACT] Found {len(patterns)} patterns")
+        except asyncio.TimeoutError:
+            print(f"[EXTRACT] ⏱️ Tree-based extraction timeout after 30s, returning empty")
+            return []
+        
+        # 4. Extract from patterns with hybrid exit + BATCH PROCESSING
+        results = []
+        batch = []
+        batch_size = 5
+        consecutive_no_pattern = 0
+        last_level = -1
+        
+        for pattern in patterns:
+            # Check if we've collected enough
+            if len(results) >= limit:
+                print(f"[EXTRACT] ✅ Reached limit: {limit}")
+                break
+            
+            # Hybrid exit: stop if no good patterns in 3 consecutive levels
+            if pattern['level'] != last_level:
+                if pattern['pattern_score'] < 0.7:
+                    consecutive_no_pattern += 1
+                else:
+                    consecutive_no_pattern = 0
+                last_level = pattern['level']
+            
+            if consecutive_no_pattern >= 3:
+                print(f"[EXTRACT] No patterns in 3 levels, stopping early")
+                break
+            
+            # Extract from each sibling in pattern
+            for sibling in pattern['siblings']:
+                if len(results) >= limit:
+                    break
+                
+                # DFS extraction with hierarchy (run in thread for CPU-intensive work)
+                tree_data = await asyncio.to_thread(self._dfs_extract_with_hierarchy, sibling)
+                
+                # Progressive flattening with path context
+                flat_record = await asyncio.to_thread(self._flatten_with_path, tree_data)
+                
+                # Map to required fields if specified
+                if required_fields:
+                    flat_record = self._map_to_fields(flat_record, required_fields)
+                
+                # Validate
+                if self._is_valid_record(flat_record):
+                    batch.append(flat_record)
+                    
+                    # Process batch when it reaches batch_size
+                    if len(batch) >= batch_size:
+                        results.extend(batch)
+                        print(f"[EXTRACT] +{len(batch)} records (batch) | Total: {len(results)}")
+                        batch = []
+                        
+                        # Allow other async tasks to run
+                        await asyncio.sleep(0)
+        
+        # Add remaining batch
+        if batch:
+            results.extend(batch)
+            print(f"[EXTRACT] +{len(batch)} records (final batch) | Total: {len(results)}")
+        
+        # 5. Deduplication
+        results = self._deduplicate(results)
+        
+        print(f"[EXTRACT] ✅ Extracted {len(results)} unique records")
+        return results[:limit]
+    
+    def _calculate_adaptive_depth(self, tree: HTMLParser) -> int:
+        """Calculate optimal max_depth based on DOM structure"""
+        try:
+            # Sample nodes to estimate average depth
+            all_nodes = tree.css('*')
+            sample_size = min(100, len(all_nodes))
+            sample_nodes = all_nodes[:sample_size]
+            
+            depths = []
+            for node in sample_nodes:
+                depth = 0
+                current = node
+                while current.parent and depth < 20:  # Safety limit
+                    depth += 1
+                    current = current.parent
+                depths.append(depth)
+            
+            if depths:
+                avg_depth = sum(depths) / len(depths)
+                adaptive_depth = min(10, int(avg_depth) + 2)
+                return adaptive_depth
+            
+        except Exception as e:
+            print(f"[EXTRACT] Depth calculation failed: {e}")
+        
+        return 8  # Reasonable default
+    
+    def _create_fingerprint(self, node) -> str:
+        """Create structural fingerprint for fast comparison"""
+        try:
+            tag = node.tag if hasattr(node, 'tag') else 'unknown'
+            child_count = len(list(node.iter())) if hasattr(node, 'iter') else 0
+            attrs = sorted(node.attributes.keys()) if hasattr(node, 'attributes') else []
+            
+            return f"{tag}-{child_count}-{','.join(attrs)}"
+        except:
+            return "unknown"
+    
+    def _bfs_discover_candidates(self, tree: HTMLParser, max_depth: int = 10) -> Dict[int, List[Dict]]:
+        """
+        BFS to discover ALL nodes grouped by level and parent.
+        Filters out hidden/invisible nodes.
+        Option C: Stops if queue gets too large (prevents runaway on complex sites).
+        
+        Args:
+            tree: Parsed HTML tree
+            max_depth: Maximum depth to traverse
+            
+        Returns:
+            {
+                0: [{node, parent, level}, ...],
+                1: [{node, parent, level}, ...],
+                ...
+            }
+        """
+        levels = {}
+        queue = [(tree.root, 0, None)]  # (node, level, parent)
+        visited = set()
+        MAX_QUEUE_SIZE = 1000  # Option C: Safety limit for complex DOMs
+        
+        while queue:
+            # Option C: Check queue size to prevent runaway BFS
+            if len(queue) > MAX_QUEUE_SIZE:
+                print(f"[EXTRACT] ⚠️ Queue size ({len(queue)}) exceeded limit ({MAX_QUEUE_SIZE}), stopping BFS early")
+                break
+            
+            node, level, parent = queue.pop(0)
+            
+            # Skip if visited or too deep
+            node_id = id(node)
+            if node_id in visited or level > max_depth:
+                continue
+            visited.add(node_id)
+            
+            # NEW: Skip hidden nodes (Fix 2 - Visibility filtering)
+            if hasattr(node, 'attributes'):
+                # Check inline style for display:none or visibility:hidden
+                style = node.attributes.get('style', '') # type: ignore
+                if style:
+                    style_lower = style.lower()
+                    if 'display:none' in style_lower or 'display: none' in style_lower:
+                        continue
+                    if 'visibility:hidden' in style_lower or 'visibility: hidden' in style_lower:
+                        continue
+                
+                # Check for 'hidden' class or attribute
+                class_attr = node.attributes.get('class', '')
+                if 'hidden' in class_attr.lower():
+                    continue
+                
+                if node.attributes.get('hidden') or node.attributes.get('aria-hidden') == 'true':
+                    continue
+            
+            # Store node info by level
+            if level not in levels:
+                levels[level] = []
+            
+            levels[level].append({
+                'node': node,
+                'parent': parent,
+                'level': level,
+                'fingerprint': self._create_fingerprint(node)
+            })
+            
+            # Add children to queue (flatten siblings)
+            if hasattr(node, 'iter'):
+                for child in node.iter():
+                    if child != node and id(child) not in visited:
+                        queue.append((child, level + 1, node))
+        
+        return levels
+    
+    def _detect_patterns_with_cache(self, levels: Dict[int, List[Dict]]) -> List[Dict]:
+        """
+        Detect repeated patterns with fingerprint caching.
+        
+        Args:
+            levels: Nodes grouped by level
+            
+        Returns:
+            List of detected patterns sorted by score
+        """
+        patterns = []
+        
+        for level_num, nodes in levels.items():
+            # Group by parent
+            by_parent = {}
+            for node_info in nodes:
+                parent_id = id(node_info['parent']) if node_info['parent'] else None
+                if parent_id not in by_parent:
+                    by_parent[parent_id] = []
+                by_parent[parent_id].append(node_info)
+            
+            # Check each parent's children for patterns
+            for parent_id, siblings in by_parent.items():
+                if len(siblings) < 2:
+                    continue
+                
+                # Extract fingerprints
+                fingerprints = [s['fingerprint'] for s in siblings]
+                
+                # Check cache
+                cache_key = tuple(sorted(fingerprints))
+                if cache_key in self._similarity_cache:
+                    score = self._similarity_cache[cache_key]
+                else:
+                    # Calculate similarity using fingerprints
+                    score = self._calculate_similarity_fast(fingerprints)
+                    self._similarity_cache[cache_key] = score
+                
+                if score > 0.7:  # 70% similarity threshold
+                    patterns.append({
+                        'parent': parent_id,
+                        'siblings': [s['node'] for s in siblings],
+                        'pattern_score': score,
+                        'level': level_num,
+                        'fingerprint': fingerprints[0]  # Representative
+                    })
+        
+        # Sort by score (best patterns first)
+        return sorted(patterns, key=lambda p: p['pattern_score'], reverse=True)
+    
+    def _calculate_similarity_fast(self, fingerprints: List[str]) -> float:
+        """Fast similarity calculation using fingerprints"""
+        if len(set(fingerprints)) == 1:
+            return 1.0  # All identical
+        
+        # Count how many match the most common fingerprint
+        from collections import Counter
+        counts = Counter(fingerprints)
+        most_common_count = counts.most_common(1)[0][1]
+        
+        return most_common_count / len(fingerprints)
+    
+    def _dfs_extract_with_hierarchy(self, node, depth: int = 0) -> Dict[str, Any]:
+        """
+        DFS extraction that preserves tree structure.
+        
+        Args:
+            node: HTML node to extract from
+            depth: Current depth in tree
+            
+        Returns:
+            {
+                'depth': int,
+                'tag': str,
+                'text': str,
+                'attributes': {...},
+                'links': [...],
+                'images': [...],
+                'children': [...]
+            }
+        """
+        result = {
+            'depth': depth,
+            'tag': node.tag if hasattr(node, 'tag') else 'unknown',
+            'text': '',
+            'attributes': {},
+            'links': [],
+            'images': [],
+            'children': []
+        }
+        
+        # Extract from current node
+        if hasattr(node, 'text'):
+            result['text'] = node.text(strip=True, deep=False) or ''
+        
+        if hasattr(node, 'attributes'):
+            result['attributes'] = dict(node.attributes)
+        
+        # Extract links
+        if result['tag'] == 'a' and result['attributes'].get('href'):
+            result['links'].append({
+                'text': result['text'],
+                'href': result['attributes']['href']
+            })
+        
+        # Extract images
+        if result['tag'] == 'img':
+            result['images'].append({
+                'src': result['attributes'].get('src', ''),
+                'alt': result['attributes'].get('alt', '')
+            })
+        
+        # Recurse to children
+        if hasattr(node, 'iter'):
+            for child in node.iter():
+                if child != node:
+                    child_data = self._dfs_extract_with_hierarchy(child, depth + 1)
+                    result['children'].append(child_data)
+        
+        return result
+    
+    def _flatten_with_path(self, tree_data: Dict, parent_context: Optional[Dict] = None, path: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Progressive flattening with path context.
+        
+        Args:
+            tree_data: Hierarchical tree data
+            parent_context: Context from parent nodes
+            path: Path from root (list of tags)
+            
+        Returns:
+            Flat dict with all data merged and path preserved
+        """
+        if path is None:
+            path = []
+        
+        flat = parent_context.copy() if parent_context else {}
+        
+        # Add path context
+        current_path = path + [tree_data['tag']]
+        flat['_path'] = ' > '.join(current_path)
+        flat['_depth'] = len(current_path)
+        
+        # Merge text
+        if tree_data['text']:
+            if 'text' not in flat:
+                flat['text'] = tree_data['text']
+            else:
+                flat['text'] += ' ' + tree_data['text']
+        
+        # Merge links
+        if tree_data['links']:
+            if 'links' not in flat:
+                flat['links'] = []
+            flat['links'].extend(tree_data['links'])
+        
+        # Merge images
+        if tree_data['images']:
+            if 'images' not in flat:
+                flat['images'] = []
+            flat['images'].extend(tree_data['images'])
+        
+        # Merge attributes
+        for key, value in tree_data['attributes'].items():
+            attr_key = f'attr_{key}' if not key.startswith('data-') else key
+            if attr_key not in flat:
+                flat[attr_key] = value
+        
+        # Recursively flatten children
+        for child in tree_data['children']:
+            child_flat = self._flatten_with_path(child, flat, current_path)
+            # Merge child data (prefer child's data for most fields)
+            for key, value in child_flat.items():
+                if key.startswith('_'):
+                    continue  # Skip internal fields
+                if key not in flat:
+                    flat[key] = value
+                elif isinstance(value, list) and isinstance(flat[key], list):
+                    # Merge lists
+                    flat[key].extend(value)
+        
+        return flat
+    
+    def _map_to_fields(self, flat_record: Dict, required_fields: List[str]) -> Dict[str, Any]:
+        """
+        Map extracted content to user's required fields.
+        Uses attribute matching and text analysis (no hardcoding!).
+        
+        Args:
+            flat_record: Flattened extracted data
+            required_fields: User-requested field names
+            
+        Returns:
+            Dict with only required fields
+        """
+        mapped = {}
+        
+        for field in required_fields:
+            field_lower = field.lower()
+            value = ''
+            
+            # Strategy 1: Direct attribute match
+            for key in flat_record.keys():
+                if field_lower in key.lower():
+                    value = flat_record[key]
+                    break
+            
+            if value:
+                mapped[field] = value
+                continue
+            
+            # Strategy 2: Semantic matching based on field name
+            if 'url' in field_lower or 'link' in field_lower or 'href' in field_lower:
+                links = flat_record.get('links', [])
+                if links:
+                    value = links[0].get('href', '')
+            
+            elif 'image' in field_lower or 'img' in field_lower or 'photo' in field_lower:
+                images = flat_record.get('images', [])
+                if images:
+                    value = images[0].get('src', '')
+            
+            elif 'title' in field_lower or 'headline' in field_lower or 'name' in field_lower:
+                # Look for text from heading tags in path
+                if 'text' in flat_record and flat_record['text']:
+                    value = flat_record['text'].split('\n')[0]  # First line
+            
+            else:
+                # Default: use text content
+                value = flat_record.get('text', '')
+            
+            mapped[field] = value if value else 'Not available'
+        
+        return mapped
+    
+    def _is_valid_record(self, record: Dict) -> bool:
+        """
+        Check if record is valid (has meaningful content).
+        
+        Args:
+            record: Extracted record
+            
+        Returns:
+            True if record has enough content
+        """
+        # Must have some text or links
+        has_text = len(record.get('text', '').strip()) > 20
+        has_links = len(record.get('links', [])) > 0
+        has_images = len(record.get('images', [])) > 0
+        
+        return has_text or has_links or has_images
+    
+    def _deduplicate(self, records: List[Dict]) -> List[Dict]:
+        """
+        Remove duplicate records based on content similarity.
+        Enhanced to use ALL fields for better deduplication (Fix 3).
+        
+        Args:
+            records: List of records
+            
+        Returns:
+            List with duplicates removed
+        """
+        unique = []
+        seen_signatures = set()
+        
+        for record in records:
+            # Create signature from ALL fields (not just text)
+            sig_parts = []
+            for key, value in sorted(record.items()):
+                if not key.startswith('_'):  # Skip internal fields like _path, _depth
+                    # Convert value to string and take first 50 chars
+                    val_str = str(value)[:50] if value else ''
+                    sig_parts.append(f"{key}:{val_str}")
+            
+            signature = '|'.join(sig_parts)
+            
+            if signature and signature not in seen_signatures:
+                unique.append(record)
+                seen_signatures.add(signature)
+            else:
+                # Debug: log skipped duplicates
+                if signature:
+                    print(f"[EXTRACT] Skipped duplicate: {signature[:100]}...")
+        
+        return unique
+    
     def extract_everything(self, html: str, url: str = '') -> Dict[str, Any]:
         """
         Synchronous wrapper for backward compatibility.
