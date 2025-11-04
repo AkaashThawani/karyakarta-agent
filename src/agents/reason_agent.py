@@ -142,6 +142,9 @@ class ReasonAgent(BaseAgent):
             self.log("Step 2: Creating execution plan...")
             plan = self._create_plan(task, analysis)
             
+            # Store original task description in plan for re-planning
+            plan["original_task_desc"] = task.description
+            
             # Step 3: Determine if we need subtasks
             if plan.get("needs_delegation", False):
                 self.log("Step 3: Task requires delegation to executors")
@@ -215,6 +218,176 @@ class ReasonAgent(BaseAgent):
             Always True
         """
         return True
+    
+    def _validate_step_success(
+        self,
+        subtask: Dict[str, Any],
+        result: Any,
+        accumulated_data: Dict[str, Any],
+        plan: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Validate if a step actually succeeded in its goal.
+        Checks both navigation success AND page relevance.
+        
+        Args:
+            subtask: The subtask that was executed
+            result: Result from tool execution
+            accumulated_data: All data from previous steps
+            plan: Optional plan context
+            
+        Returns:
+            {
+                'valid': bool,
+                'reason': str,
+                'needs_replan': bool
+            }
+        """
+        tool_name = subtask["tool"]
+        result_data = result.data if hasattr(result, 'data') else result
+        
+        # Navigation validation (playwright_execute)
+        if tool_name == "playwright_execute":
+            method = subtask["parameters"].get("method", "")
+            
+            if method == "goto":
+                # Check if navigation succeeded
+                if not result_data or (isinstance(result_data, str) and "error" in result_data.lower()):
+                    return {
+                        "valid": False,
+                        "reason": "Navigation failed or page didn't load",
+                        "needs_replan": True
+                    }
+            
+            elif method == "click":
+                # Check if click led somewhere or triggered action
+                if not result_data:
+                    return {
+                        "valid": False,
+                        "reason": "Click action produced no result",
+                        "needs_replan": True
+                    }
+        
+        # Extraction validation (chart_extractor)
+        elif tool_name == "chart_extractor":
+            required_fields = plan.get("required_fields", []) if plan else []
+            
+            # Check if extraction got data
+            if not result_data or (isinstance(result_data, list) and len(result_data) == 0):
+                return {
+                    "valid": False,
+                    "reason": "Extraction returned no data - wrong page or empty content",
+                    "needs_replan": True
+                }
+            
+            # Check if extracted data has required fields
+            if required_fields and isinstance(result_data, list) and len(result_data) > 0:
+                first_record = result_data[0]
+                if isinstance(first_record, dict):
+                    present_fields = set(first_record.keys())
+                    required_set = set(required_fields)
+                    missing = required_set - present_fields
+                    
+                    if len(missing) > len(required_fields) * 0.7:  # More than 70% fields missing
+                        return {
+                            "valid": False,
+                            "reason": f"Extracted wrong data type - missing {len(missing)}/{len(required_fields)} fields",
+                            "needs_replan": True
+                        }
+        
+        # All checks passed
+        return {
+            "valid": True,
+            "reason": "Step completed successfully",
+            "needs_replan": False
+        }
+    
+    def _dynamic_replan(
+        self,
+        original_task_desc: str,
+        failed_step: Dict[str, Any],
+        validation_result: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Re-invoke comprehensive analysis to create new execution steps.
+        Uses LLM to understand what went wrong and plan alternative approach.
+        
+        Args:
+            original_task_desc: Original user request
+            failed_step: The step that failed validation
+            validation_result: Validation failure details
+            context: Execution context including previous attempts
+            
+        Returns:
+            List of new subtasks or empty list if re-planning fails
+        """
+        if not self.llm_service:
+            print("[REASON] No LLM service for re-planning")
+            return []
+        
+        # Build re-planning prompt
+        prompt = f"""A task execution step failed validation. Analyze why and create alternative steps.
+
+Original Task: "{original_task_desc}"
+
+Failed Step:
+- Tool: {failed_step['tool']}
+- Description: {failed_step.get('description', '')}
+- Parameters: {json.dumps(failed_step.get('parameters', {}))}
+
+Failure Reason: {validation_result['reason']}
+
+Previous Attempts:
+{json.dumps(context.get('previous_attempt', {}), indent=2)}
+
+Create alternative steps to accomplish the original task. Consider:
+1. Did we visit the wrong page? (e.g., listing instead of detail page)
+2. Do we need to navigate deeper? (e.g., click "Showtimes" link)
+3. Should we try a different source/URL?
+4. Do we need intermediate navigation steps?
+
+Return JSON array of new steps:
+[
+  {{"tool": "tool_name", "parameters": {{}}, "description": "what this does"}}
+]
+
+RETURN ONLY VALID JSON ARRAY:"""
+        
+        try:
+            print("[REASON] 🔄 Re-planning with LLM...")
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content.strip()
+            
+            # Extract JSON array
+            import re
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            if json_match:
+                new_steps_data = json.loads(json_match.group())
+                
+                # Convert to proper subtask format
+                new_subtasks = []
+                for idx, step_data in enumerate(new_steps_data):
+                    subtask = {
+                        "subtask_id": f"{failed_step['subtask_id']}_replan_{idx}",
+                        "tool": step_data.get("tool", ""),
+                        "parameters": step_data.get("parameters", {}),
+                        "description": step_data.get("description", "")
+                    }
+                    new_subtasks.append(subtask)
+                
+                print(f"[REASON] ✅ Re-planning generated {len(new_subtasks)} new steps")
+                return new_subtasks
+            else:
+                print("[REASON] ⚠️ Could not parse re-planning response")
+                return []
+                
+        except Exception as e:
+            print(f"[REASON] ❌ Re-planning failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
     
     def _analyze_task(self, task: AgentTask) -> Dict[str, Any]:
         """
@@ -372,6 +545,37 @@ For multi-step tasks, the system AUTOMATICALLY passes data between steps:
 
 **Rule:** If a parameter will come from a previous step, DO NOT include it in the JSON. The system handles it.
 
+**CRITICAL: Task Planning Principles**
+
+When creating the "steps" array, apply these principles for detailed, granular planning:
+
+1. **Multi-Source Requirement Detection**:
+   - If task asks to "find X near me" or "get Y from multiple places"
+   - Plan to check 3-5 different sources, not just one
+   - Each source needs its own navigation + extraction steps
+
+2. **Navigation Depth Analysis**:
+   - Listing pages: Have basic info (names, titles, categories)
+   - Detail pages: Have specific info (prices, times, specs, contact)
+   - If user requests detailed fields → plan navigation to detail pages
+
+3. **Atomic Step Breakdown**:
+   - Break each action into smallest possible steps
+   - playwright_execute can be used multiple times in sequence
+   - Each step should do ONE thing: goto OR click OR extract
+
+4. **Step Sequencing Rules**:
+   - After navigation (goto): Add wait or click steps if needed
+   - After clicks that navigate: Add extraction steps
+   - For multiple sources: Repeat navigation → action → extract pattern
+
+5. **Tool Repetition**:
+   - Same tool can appear multiple times with different parameters
+   - Example: playwright_execute for goto, then click, then goto again
+   - Example: chart_extractor called once per page visited
+
+**Apply these principles when creating detailed steps in task_structure.**
+
 Return JSON:
 {{
     "task_type": "search|api_request|web_scraping|general",
@@ -449,7 +653,8 @@ JSON:"""
         try:
             model = self.llm_service.get_model()
             response = model.invoke(prompt)
-            content = response.content.strip()
+            content = response.content if hasattr(response, 'content') else str(response)
+            content = content.strip()
             
             import re
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
@@ -1508,12 +1713,32 @@ Return ONLY valid JSON:"""
                 # Navigate
                 await page.goto(url, wait_until='domcontentloaded')
                 
-                # DISABLED: Site Intelligence (causing JSON parsing issues)
-                # TODO: Re-enable after fixing "Extra data" JSON parsing
-                # from urllib.parse import urlparse
-                # domain = urlparse(url).netloc
-                # ... (Site Intelligence code commented out)
-                print(f"[REASON] ⚠️ Site Intelligence disabled - extracting directly")
+                # NEW: Use Site Intelligence V2 for learning
+                try:
+                    from src.tools.site_intelligence_v2 import SiteIntelligenceV2
+                    site_intelligence = SiteIntelligenceV2()
+
+                    # Check for cached selectors first
+                    cached_selectors = site_intelligence.get_cached_selectors(url, required_fields)
+                    if cached_selectors:
+                        print(f"[REASON] 🚀 Using cached selectors from Site Intelligence V2")
+                        records = await site_intelligence.extract_with_cached_selectors(page, cached_selectors, limit=10)
+                        if records and len(records) >= 3:
+                            print(f"[REASON] ✅ Site Intelligence V2 extracted {len(records)} records!")
+                            return {
+                                'url': url,
+                                'data': records,
+                                'success': True,
+                                'count': len(records)
+                            }
+                        else:
+                            print(f"[REASON] Site Intelligence V2 failed, falling back to direct extraction")
+
+                    # Learn from successful extraction (will be called after extraction succeeds)
+                    # This is handled in the calling code after successful extraction
+
+                except Exception as e:
+                    print(f"[REASON] Site Intelligence V2 failed: {e}, extracting directly")
                 
                 # Get HTML
                 html = await page.content()
@@ -1617,7 +1842,8 @@ Return ONLY valid JSON:"""
             resolved_params = resolver.resolve_inputs(
                 tool_name=tool_name,
                 provided_params=provided_params,
-                accumulated_data=accumulated_data
+                accumulated_data=accumulated_data,
+                subtask_context={"subtask_index": i + 1}  # Pass subtask index for dynamic URL resolution
             )
             
             # Update subtask with resolved parameters
@@ -1786,6 +2012,33 @@ Return ONLY valid JSON:"""
                 if result.success and result.metadata:
                     is_complete = result.metadata.get("complete", True)
                     
+                    # NEW: Semantic validation - check if data TYPE matches user intent
+                    if is_complete and result.data:
+                        semantic_check = self._validate_data_semantics(
+                            original_task=plan.get("original_task_desc", ""),
+                            extracted_data=result.data,
+                            tool_name=tool_name
+                        )
+                        
+                        if not semantic_check["correct"]:
+                            print(f"[REASON] ⚠️ SEMANTIC MISMATCH: {semantic_check['reason']}")
+                            is_complete = False
+                            reason = semantic_check["reason"]
+                            next_action = semantic_check.get("suggested_action", "search_more_sources") if semantic_check else "search_more_sources"
+                            coverage = "0%"  # Wrong data type = 0% coverage
+                    
+                    # Auto-detect incompleteness from data quality
+                    if is_complete and tool_name == "playwright_execute":
+                        # Check if playwright returned suspiciously few results
+                        data = result.data
+                        if isinstance(data, list) and 1 <= len(data) <= 5:
+                            # Got very few results - likely incomplete
+                            print(f"[REASON] ⚠️ Playwright returned only {len(data)} items - likely incomplete")
+                            is_complete = False
+                            reason = f"Only found {len(data)} items, expected more"
+                            next_action = "use_alternative_extraction"
+                            coverage = f"{len(data)*10}%"  # Rough estimate
+                        
                     if not is_complete:
                         reason = result.metadata.get("completeness_reason", "Task incomplete")
                         next_action = result.metadata.get("suggested_action", "search_more_sources")
@@ -2357,6 +2610,30 @@ Your response:"""
                 print(f"[REASON] All sources exhausted for content type")
                 return None
             
+            elif suggested_action == "use_alternative_extraction":
+                # NEW: Switch from playwright_execute to chart_extractor for better results
+                print(f"[REASON] 🔄 Switching to chart_extractor for more complete extraction")
+                
+                # Get the current URL (should be in accumulated data or plan context)
+                current_url = original_params.get("url", "")
+                
+                # Get required fields from the plan
+                required_fields = []
+                # Try to infer what fields were expected from the original task
+                if "required_fields" in original_params:
+                    required_fields = original_params["required_fields"]
+                
+                follow_up = {
+                    "subtask_id": f"{original_subtask['subtask_id']}_chart_extract",
+                    "tool": "chart_extractor",
+                    "parameters": {
+                        "required_fields": required_fields,
+                        "limit": 50  # Request more items
+                    },
+                    "description": f"Use chart_extractor for comprehensive extraction: {reason}"
+                }
+                return follow_up
+            
             elif suggested_action == "extract_more_details":
                 # For extraction, try to get missing fields
                 # Could switch to a more detailed extraction tool
@@ -2397,6 +2674,100 @@ Your response:"""
             import traceback
             traceback.print_exc()
             return None
+    
+    def _validate_data_semantics(
+        self,
+        original_task: str,
+        extracted_data: Any,
+        tool_name: str
+    ) -> Dict[str, Any]:
+        """
+        Validate if extracted data TYPE matches user intent (semantic validation).
+        
+        Example: User asks for "songs" but got "playlists" - fields match but TYPE is wrong.
+        
+        Args:
+            original_task: Original user request
+            extracted_data: Data that was extracted
+            tool_name: Tool that extracted the data
+            
+        Returns:
+            {
+                "correct": bool,
+                "reason": str,
+                "suggested_action": str
+            }
+        """
+        # Only validate chart_extractor results
+        if tool_name != "chart_extractor" or not extracted_data:
+            return {"correct": True, "reason": ""}
+        
+        # Skip validation if no LLM service
+        if not self.llm_service:
+            return {"correct": True, "reason": ""}
+        
+        # Get sample of data for validation (first 3 records)
+        if isinstance(extracted_data, list) and extracted_data:
+            sample_data = extracted_data[:3]
+        else:
+            sample_data = extracted_data
+        
+        # Build validation prompt
+        prompt = f"""Check if extracted data matches user intent.
+
+User asked: "{original_task}"
+Extracted data sample:
+{json.dumps(sample_data, indent=2)[:500]}
+
+Does the extracted data match what the user requested?
+
+Example 1:
+User: "top 10 songs on spotify"
+Data: [{{"title": "Top Songs - Global", "type": "playlist"}}]
+Answer: NO - User wanted individual songs, not playlists
+
+Example 2:
+User: "restaurants in NYC"
+Data: [{{"name": "Joe's Pizza", "address": "NYC", "type": "restaurant"}}]
+Answer: YES - Data matches request
+
+Example 3:
+User: "movie showtimes"
+Data: [{{"name": "AMC Theater", "type": "theater"}}]
+Answer: NO - User wanted showtimes, not theater names
+
+Your analysis:
+- Does data type match request? (YES/NO)
+- If NO, what went wrong?
+- Suggested action (search_more_sources, navigate_to_detail_page, etc.)
+
+Return ONLY JSON:
+{{
+  "correct": true/false,
+  "reason": "explanation",
+  "suggested_action": "action"
+}}
+
+JSON:"""
+        
+        try:
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content if hasattr(response, 'content') else str(response)
+            content = content.strip()
+
+            # Extract JSON
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                return result
+            
+        except Exception as e:
+            print(f"[REASON] Semantic validation failed: {e}")
+        
+        # Default: assume correct
+        return {"correct": True, "reason": ""}
     
     def _get_used_domains(self, subtask: Dict[str, Any]) -> List[str]:
         """

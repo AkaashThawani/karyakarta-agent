@@ -105,13 +105,30 @@ class PlaywrightChartExtractor:
     def __init__(self):
         self.cache = PatternCache()
         self.last_successful_pattern: Optional[Dict[str, Any]] = None
+        # NEW: Site Intelligence V2
+        try:
+            from src.tools.site_intelligence_v2 import SiteIntelligenceV2
+            self.site_intelligence = SiteIntelligenceV2()
+            print("[EXTRACT] Site Intelligence V2 enabled")
+        except Exception as e:
+            print(f"[EXTRACT] Site Intelligence V2 not available: {e}")
+            self.site_intelligence = None
+        # NEW: Learning Manager
+        try:
+            from src.tools.learning_manager import get_learning_manager
+            self.learning_manager = get_learning_manager()
+            print("[EXTRACT] Learning Manager enabled")
+        except Exception as e:
+            print(f"[EXTRACT] Learning Manager not available: {e}")
+            self.learning_manager = None
     
     async def extract_chart(
         self,
         page: Page,
         url: str,
         required_fields: List[str],
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        result_storage: Optional[List[Dict[str, Any]]] = None
     ) -> List[Dict[str, Any]]:
         """
         Extract chart data using multi-layer approach.
@@ -121,6 +138,7 @@ class PlaywrightChartExtractor:
             url: URL to extract from
             required_fields: List of field names to extract
             limit: Maximum number of records (enables early termination)
+            result_storage: Optional external list to progressively save results (survives timeout)
         
         Priority:
         1. UniversalExtractor (extract EVERYTHING, then search)
@@ -148,14 +166,32 @@ class PlaywrightChartExtractor:
         
         # Quick wait for content to load (2s max)
         try:
-            await page.wait_for_selector('div[class*="event"], article, [data-event]', timeout=2000)
+            await asyncio.sleep(2)
         except:
             pass  # Continue anyway
         
         print(f"[EXTRACT] ✅ Page ready, starting extraction")
         
-        # NEW: Step 0 - Try UniversalExtractor with tree-based method first!
+        # NEW: Step 0 - Check for cached selectors from Site Intelligence V2
+        if self.site_intelligence:
+            cached_selectors = self.site_intelligence.get_cached_selectors(url, required_fields)
+            if cached_selectors:
+                print(f"[EXTRACT] 🚀 Using cached selectors from Site Intelligence V2")
+                cached_records = await self.site_intelligence.extract_with_cached_selectors(
+                    page, 
+                    cached_selectors, 
+                    limit=limit or 10
+                )
+                if cached_records and len(cached_records) >= 3:
+                    print(f"[EXTRACT] ✅ Cached selectors extracted {len(cached_records)} records!")
+                    return cached_records
+                else:
+                    print(f"[EXTRACT] Cached selectors failed, falling back to tree extraction")
+        
+        # NEW: Step 1 - Try UniversalExtractor with tree-based method first!
         print(f"[EXTRACT] 🌳 Trying tree-based extraction (BFS+DFS+flattening)...")
+        import time
+        tree_start_time = time.time()
         try:
             from src.tools.universal_extractor import UniversalExtractor, SmartSearcher
             
@@ -166,14 +202,33 @@ class PlaywrightChartExtractor:
             extractor = UniversalExtractor()
             
             # Try tree-based extraction first (more accurate with global limit)
-            tree_records = extractor.extract_with_tree_structure(
+            tree_records = await extractor.extract_with_tree_structure_async(
                 html=html,
                 limit=limit or 10,
-                required_fields=required_fields
+                required_fields=required_fields,
+                result_storage=result_storage  # Pass storage for progressive saving
             )
             
             if tree_records and len(tree_records) >= 3:
+                tree_time = time.time() - tree_start_time
                 print(f"[EXTRACT] ✅ Tree-based extraction found {len(tree_records)} records!")
+                
+                # NEW: Record successful tree extraction
+                if self.learning_manager:
+                    self.learning_manager.record_tool_execution(
+                        url, "tree_extraction", success=True, response_time=tree_time
+                    )
+                
+                # NEW: Learn from successful extraction
+                if self.site_intelligence:
+                    print(f"[EXTRACT] 🎓 Learning selectors for future visits...")
+                    await self.site_intelligence.learn_from_extraction(
+                        page, 
+                        url, 
+                        tree_records, 
+                        required_fields
+                    )
+                
                 return tree_records
             
             print(f"[EXTRACT] Tree-based found {len(tree_records)} records, trying legacy method...")
@@ -212,17 +267,52 @@ class PlaywrightChartExtractor:
             # If search found matches, return them
             if records and len(records) >= 3:
                 print(f"[EXTRACT] ✅ SmartSearcher found {len(records)} matching records!")
+                
+                # NEW: Learn from successful extraction
+                if self.site_intelligence:
+                    print(f"[EXTRACT] 🎓 Learning selectors for future visits...")
+                    await self.site_intelligence.learn_from_extraction(
+                        page, 
+                        url, 
+                        records[:10],  # Use first 10 for learning
+                        required_fields
+                    )
+                
                 return records[:50]
             
             # If search didn't find matches but we have cards, return them anyway
             # Let synthesis LLM do the smart filtering
             if all_data.get('cards') and len(all_data['cards']) >= 3:
                 print(f"[EXTRACT] SmartSearcher found no matches, but returning {len(all_data['cards'])} cards for LLM synthesis")
+                
+                # NEW: Learn from cards
+                if self.site_intelligence:
+                    print(f"[EXTRACT] 🎓 Learning selectors from cards...")
+                    await self.site_intelligence.learn_from_extraction(
+                        page, 
+                        url, 
+                        all_data['cards'][:10],
+                        required_fields
+                    )
+                
                 return all_data['cards'][:50]
             
             print(f"[EXTRACT] UniversalExtractor found insufficient data")
+            
+            # Record tree extraction failure
+            if self.learning_manager:
+                tree_time = time.time() - tree_start_time
+                self.learning_manager.record_tool_execution(
+                    url, "tree_extraction", success=False, response_time=tree_time
+                )
         except Exception as e:
             print(f"[EXTRACT] UniversalExtractor failed: {e}")
+            # Record tree extraction failure
+            if self.learning_manager:
+                tree_time = time.time() - tree_start_time
+                self.learning_manager.record_tool_execution(
+                    url, "tree_extraction", success=False, response_time=tree_time
+                )
         
         # NEW: Check if this is a new site
         cached = self.cache.get_pattern(domain)
@@ -237,11 +327,20 @@ class PlaywrightChartExtractor:
         # Step 1: Try cached selectors
         if cached:
             print(f"[EXTRACT] Trying cached pattern...")
-            records = await self._extract_with_selectors(page, cached)
-            validation = self._validate_completeness(records, required_fields, url)
-            if validation.get('coverage', 0.0) >= 0.8:
-                print(f"[EXTRACT] ✅ Cached pattern worked!")
-                return records
+            try:
+                # Add 10 second timeout to prevent hanging
+                records = await asyncio.wait_for(
+                    self._extract_with_selectors(page, cached),
+                    timeout=10.0
+                )
+                validation = self._validate_completeness(records, required_fields, url)
+                if validation.get('coverage', 0.0) >= 0.8:
+                    print(f"[EXTRACT] ✅ Cached pattern worked!")
+                    return records
+                else:
+                    print(f"[EXTRACT] Cached pattern had low coverage ({validation.get('coverage', 0.0):.0%})")
+            except asyncio.TimeoutError:
+                print(f"[EXTRACT] ⏱️ Cached pattern timeout after 10s, continuing to LLM fallback...")
         
         # DISABLED: Playwright locators - causes hangs, UniversalExtractor already extracts everything
         # print(f"[EXTRACT] Trying Playwright locators...")
@@ -284,7 +383,16 @@ class PlaywrightChartExtractor:
         
         # Step 4: Full LLM fallback
         print(f"[EXTRACT] All scraping failed, using full LLM extraction...")
+        llm_start_time = time.time()
         records = await self._llm_extract_all(page, required_fields)
+        llm_time = time.time() - llm_start_time
+        
+        # NEW: Record LLM extraction result
+        if self.learning_manager:
+            success = bool(records and len(records) >= 3)
+            self.learning_manager.record_tool_execution(
+                url, "llm_extraction", success=success, response_time=llm_time
+            )
         
         # NEW: If LLM succeeded, learn from it!
         if records:

@@ -17,5 +17,22 @@
       "last_used": "2025-11-01T14:32:35.970906",
       "use_count": 1
     }
+  ],
+  "www.timesnownews.com": [
+    {
+      "pattern": {
+        "container": "body",
+        "row": "div, li",
+        "fields": {
+          "title": "h3:has-text('Oppo Reno 15 Pro, Re')"
+        }
+      },
+      "fields": [
+        "title"
+      ],
+      "success_rate": 0.9,
+      "last_used": "2025-11-03T15:25:09.593960",
+      "use_count": 1
+    }
   ]
 }

@@ -69,74 +69,12 @@ Step 5 - SYNTHESIS:
 AVAILABLE CAPABILITIES:
 {available_tools}
 
-PLAYWRIGHT UNIVERSAL TOOL - BROWSER AUTOMATION:
-When planning browser automation tasks, use the "playwright_execute" tool with specific methods:
-
-NAVIGATION METHODS:
-- goto: Navigate to URL → args: {{"url": "https://example.com"}}
-- go_back: Go back in history
-- go_forward: Go forward in history  
-- reload: Reload current page
-
-INTERACTION METHODS:
-- click: Click element → selector: "button.submit"
-- fill: Fill input field → selector: "input[name='email']", args: {{"value": "text"}}
-- press: Press keyboard key → selector: "input", args: {{"key": "Enter"}}
-- hover: Hover over element → selector: ".menu-item"
-- check: Check checkbox → selector: "input[type='checkbox']"
-- uncheck: Uncheck checkbox → selector: "input[type='checkbox']"
-- select_option: Select dropdown → selector: "select", args: {{"value": "option1"}}
-
-CONTENT EXTRACTION:
-- content: Get full HTML of page
-- inner_text: Get element text → selector: "h1"
-- inner_html: Get element HTML → selector: ".container"
-- text_content: Get text content → selector: "p"
-- get_attribute: Get attribute → selector: "a", args: {{"name": "href"}}
-
-SCREENSHOTS:
-- screenshot: Take screenshot → args: {{"full_page": true}}
-
-WAITING METHODS:
-- wait_for_selector: Wait for element → selector: ".loading", args: {{"state": "visible"}}
-- wait_for_load_state: Wait for page load → args: {{"state": "networkidle"}}
-- wait_for_timeout: Wait milliseconds → args: {{"timeout": 2000}}
-
-EVALUATION:
-- evaluate: Execute JavaScript → args: {{"expression": "document.title"}}
-
-PLAN FORMAT FOR PLAYWRIGHT:
-{{
-    "steps": [
-        {{
-            "step": 1,
-            "action": "Navigate to login page",
-            "tool": "playwright_execute",
-            "method": "goto",
-            "args": {{"url": "https://example.com/login"}}
-        }},
-        {{
-            "step": 2,
-            "action": "Fill username",
-            "tool": "playwright_execute",
-            "method": "fill",
-            "selector": "input[name='username']",
-            "args": {{"value": "user@example.com"}}
-        }},
-        {{
-            "step": 3,
-            "action": "Click submit",
-            "tool": "playwright_execute",
-            "method": "click",
-            "selector": "button[type='submit']"
-        }}
-    ]
-}}
 
 PLANNING GUIDELINES:
 ✓ Break complex tasks into manageable subtasks
 ✓ Consider dependencies (Task B needs Task A's results)
 ✓ Choose most efficient tools for each subtask
+✓ **Use chart_extractor for lists/tables, playwright_execute for interactions**
 ✓ Plan for potential failures with fallbacks
 ✓ Synthesize results into unified answers
 ✓ Maintain conversation context

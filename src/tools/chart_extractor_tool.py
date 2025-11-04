@@ -33,6 +33,15 @@ class ChartExtractorTool(BaseTool):
         """Initialize Chart Extractor Tool."""
         super().__init__()
         self.extractor = PlaywrightChartExtractor()
+        self.partial_results = []  # Shared storage for progressive saving
+        
+        # NEW: Learning Manager
+        try:
+            from src.tools.learning_manager import get_learning_manager
+            self.learning_manager = get_learning_manager()
+        except Exception as e:
+            print(f"[CHART_TOOL] Learning Manager not available: {e}")
+            self.learning_manager = None
     
     @property
     def name(self) -> str:
@@ -261,31 +270,102 @@ class ChartExtractorTool(BaseTool):
                 if not url:
                     url = page.url
                 
-                print(f"[CHART_TOOL] Extracting from {url}")
+                # Add timestamp logging
+                import time
+                from datetime import datetime
+                
+                def log_time(msg):
+                    now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                    print(f"[CHART_TOOL] ⏱️ {now} - {msg}")
+                
+                log_time(f"Ready to extract from {url}")
                 print(f"[CHART_TOOL] Required fields: {required_fields}")
                 
-                # Extract data with 60 second timeout
+                # Check if page has content with timeout
+                log_time("Getting page HTML...")
+                start_html = time.time()
                 try:
+                    html = await asyncio.wait_for(page.content(), timeout=30.0)
+                    html_time = time.time() - start_html
+                    html_size_mb = len(html) / (1024 * 1024)
+                    log_time(f"Got HTML ({html_size_mb:.2f} MB) in {html_time:.2f}s")
+                except asyncio.TimeoutError:
+                    html_time = time.time() - start_html
+                    log_time(f"⏱️ HTML fetch timeout after {html_time:.2f}s")
+                    return ToolResult(
+                        success=False,
+                        error=f"Failed to get page HTML after 30 seconds. Page may be too complex or have loading issues.",
+                        metadata={
+                            "url": url,
+                            "required_fields": required_fields,
+                            "html_timeout": True
+                        }
+                    )
+                
+                # Clear previous partial results
+                self.partial_results = []
+                
+                log_time("Starting extraction...")
+                
+                # Extract data with 60 second timeout and progressive saving
+                try:
+                    start_extract = time.time()
                     records = await asyncio.wait_for(
                         self.extractor.extract_chart(
                             page=page,
                             url=url,
                             required_fields=required_fields,
-                            limit=limit  # Pass limit to extractor for early termination
+                            limit=limit,  # Pass limit to extractor for early termination
+                            result_storage=self.partial_results  # Pass storage for progressive saving
                         ),
                         timeout=60.0  # 60 second timeout
                     )
+                    extract_time = time.time() - start_extract
+                    log_time(f"Extraction completed in {extract_time:.2f}s")
                 except asyncio.TimeoutError:
                     print(f"[CHART_TOOL] ⏱️ Extraction timeout after 60 seconds")
-                    return ToolResult(
-                        success=False,
-                        error="Extraction timeout after 60 seconds. Page may be too complex.",
-                        metadata={
-                            "url": url,
-                            "required_fields": required_fields,
-                            "timeout": True
-                        }
-                    )
+                    print(f"[CHART_TOOL] 📊 Checking partial results...")
+                    print(f"[CHART_TOOL] 💾 Found {len(self.partial_results)} records in storage")
+                    
+                    # Check if we have partial results
+                    if self.partial_results:
+                        # Apply limit to partial results
+                        partial_records = self.partial_results[:limit] if limit else self.partial_results
+                        
+                        print(f"[CHART_TOOL] ✅ Returning {len(partial_records)} partial records collected before timeout")
+                        
+                        # Add completeness metadata
+                        completeness_metadata = self._add_completeness_metadata(
+                            data=partial_records,
+                            requested_count=requested_count or limit,
+                            requested_fields=required_fields,
+                            task_description=task_description
+                        )
+                        
+                        return ToolResult(
+                            success=True,  # Success with partial data
+                            data=partial_records,
+                            metadata={
+                                "url": url,
+                                "count": len(partial_records),
+                                "required_fields": required_fields,
+                                "extracted_fields": list(partial_records[0].keys()) if partial_records else [],
+                                "timeout": True,
+                                "partial": True,
+                                **completeness_metadata
+                            }
+                        )
+                    else:
+                        # No partial results - true failure
+                        return ToolResult(
+                            success=False,
+                            error="Extraction timeout after 60 seconds with no data collected. Page may be too complex.",
+                            metadata={
+                                "url": url,
+                                "required_fields": required_fields,
+                                "timeout": True
+                            }
+                        )
                 
                 # Apply limit if specified
                 if limit and isinstance(records, list):

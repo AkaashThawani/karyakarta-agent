@@ -78,6 +78,14 @@ class UniversalPlaywrightTool(BaseTool):
         self.browserless_token = os.getenv("BROWSERLESS_API_KEY", "")
         self._last_url = None  # Track URL changes for auto-learning
         
+        # NEW: Learning Manager
+        try:
+            from src.tools.learning_manager import get_learning_manager
+            self.learning_manager = get_learning_manager()
+        except Exception as e:
+            print(f"[PLAYWRIGHT] Learning Manager not available: {e}")
+            self.learning_manager = None
+        
         # Initialize persistent event loop for this session
         if session_id not in UniversalPlaywrightTool._event_loops:
             # Create new event loop
@@ -409,28 +417,68 @@ class UniversalPlaywrightTool(BaseTool):
                     selector = selector_hint
         
         # AUTO-LEARNING: Even with direct selector, check if site is in map
-        # If site is unmapped, trigger Site Intelligence to learn it
+        # If site is unmapped, trigger Site Intelligence V2 to learn it
         if selector and not selector_hint:
             # Get URL from page if not explicitly provided
             current_url = url if url else (self._page.url if self._page else None)
-            
+
             if current_url:
                 from urllib.parse import urlparse
                 parsed = urlparse(current_url)
                 domain = parsed.netloc or parsed.path
                 if domain.startswith('www.'):
                     domain = domain[4:]
-                
+
                 # Check if domain exists in selector map
                 selector_map = get_selector_map()
-                
+
                 # Check if we have any cached data for this domain
                 cache_file = selector_map.cache_dir / f"{domain}.json"
-                
+
                 if not cache_file.exists():
-                    # DISABLED: Site Intelligence auto-learning
-                    # TODO: Re-enable after fixing "Extra data" JSON parsing
-                    print(f"[PLAYWRIGHT] ⚠️ Site Intelligence disabled - skipping auto-learn for '{domain}'")
+                    print(f"[PLAYWRIGHT] 🆕 New site detected: {domain} - triggering auto-learning with Site Intelligence V2")
+
+                    try:
+                        # Import Site Intelligence V2
+                        from src.tools.site_intelligence_v2 import SiteIntelligenceV2
+                        from src.tools.universal_extractor import UniversalExtractor
+
+                        # Initialize Site Intelligence V2
+                        site_intelligence = SiteIntelligenceV2()
+
+                        # Ensure page is available
+                        if self._page is None:
+                            print(f"[PLAYWRIGHT] ⚠️ Page not available for learning on {domain}")
+                        else:
+                            # Do basic extraction to get sample data for learning
+                            html = self.run_async(self._page.content())
+                            extractor = UniversalExtractor()
+
+                            # Extract basic data with common fields
+                            basic_records = extractor.extract_with_tree_structure(
+                                html=html,
+                                limit=5,  # Small sample for learning
+                                required_fields=["title", "description", "name", "text", "link"]
+                            )
+
+                            if basic_records and len(basic_records) >= 2:
+                                print(f"[PLAYWRIGHT] ✅ Extracted {len(basic_records)} sample records for learning")
+
+                                # Learn selectors from the extracted data
+                                self.run_async(site_intelligence.learn_from_extraction(
+                                    self._page,
+                                    current_url,
+                                    basic_records,
+                                    ["title", "description", "name", "text", "link"]
+                                ))
+
+                                print(f"[PLAYWRIGHT] 🎓 Site Intelligence V2 learned selectors for {domain}")
+                            else:
+                                print(f"[PLAYWRIGHT] ⚠️ Insufficient data for learning on {domain}")
+
+                    except Exception as e:
+                        print(f"[PLAYWRIGHT] ❌ Auto-learning failed for {domain}: {e}")
+                        # Continue without learning - don't break the main flow
         
         if self.logger:
             self.logger.status(f"Executing Playwright method: {method}")
@@ -698,8 +746,17 @@ class UniversalPlaywrightTool(BaseTool):
                 call_args.append(selector)
         
         # Call the method
+        import time
+        action_start_time = time.time()
         try:
             result = await page_method(*call_args, **call_kwargs)
+            action_time = time.time() - action_start_time
+            
+            # NEW: Record successful browser action
+            if self.learning_manager and url:
+                self.learning_manager.record_tool_execution(
+                    url, f"playwright_{method}", success=True, response_time=action_time
+                )
             
             # Send success log
             self._send_playwright_log(method, selector, args, url, status='success')
@@ -735,6 +792,14 @@ class UniversalPlaywrightTool(BaseTool):
             # Handle different return types - pass context for better serialization
             return self._serialize_result(result, method, selector, args)
         except Exception as e:
+            action_time = time.time() - action_start_time
+            
+            # NEW: Record failed browser action
+            if self.learning_manager and url:
+                self.learning_manager.record_tool_execution(
+                    url, f"playwright_{method}", success=False, response_time=action_time
+                )
+            
             # Send failure log with error details
             print(f"[PLAYWRIGHT] ERROR in {method}: {type(e).__name__}: {str(e)}")
             self._send_playwright_log(method, selector, args, url, status='failed')

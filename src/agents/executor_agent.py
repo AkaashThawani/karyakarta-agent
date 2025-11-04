@@ -47,7 +47,7 @@ class ExecutorAgent(BaseAgent):
         agent_id: str,
         tools: List[BaseTool],
         logger: Optional[Any] = None,
-        max_retries: int = 3
+        max_retries: int = 1  # Changed from 3 to 1: No retries with progressive saving
     ):
         """
         Initialize Executor Agent.
@@ -56,7 +56,7 @@ class ExecutorAgent(BaseAgent):
             agent_id: Unique identifier for this agent
             tools: List of tools this agent can execute
             logger: Optional logging service
-            max_retries: Maximum retry attempts for failed executions
+            max_retries: Maximum retry attempts (default 1 = no retries, progressive saving preserves partial results)
         """
         # Get tool names for capabilities
         capabilities = [tool.name for tool in tools]

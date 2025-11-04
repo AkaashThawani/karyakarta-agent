@@ -17,6 +17,10 @@ def load_tool_registry() -> Dict[str, Dict[str, Any]]:
     
     Returns:
         dict: Tool registry with only enabled tools
+        
+    Raises:
+        FileNotFoundError: If tool_registry.json is not found
+        json.JSONDecodeError: If tool_registry.json is invalid
     """
     registry_path = os.path.join(os.path.dirname(__file__), "..", "..", "tool_registry.json")
     
@@ -35,144 +39,13 @@ def load_tool_registry() -> Dict[str, Dict[str, Any]]:
         return enabled_registry
         
     except FileNotFoundError:
-        print(f"[REGISTRY] Warning: tool_registry.json not found at {registry_path}")
-        print("[REGISTRY] Falling back to static registry")
-        return _get_fallback_registry()
+        print(f"[REGISTRY] ERROR: tool_registry.json not found at {registry_path}")
+        print("[REGISTRY] This is a deployment error - registry file must exist")
+        raise
     except json.JSONDecodeError as e:
-        print(f"[REGISTRY] Error parsing tool_registry.json: {e}")
-        print("[REGISTRY] Falling back to static registry")
-        return _get_fallback_registry()
+        print(f"[REGISTRY] ERROR: Invalid JSON in tool_registry.json: {e}")
+        raise
 
-
-def _get_fallback_registry() -> Dict[str, Dict[str, Any]]:
-    """
-    Fallback registry if JSON file not found.
-    
-    Returns:
-        dict: Basic tool registry
-    """
-    return {
-    "playwright_execute": {
-        "description": "Universal browser automation tool - execute any Playwright Page method",
-        "capabilities": [
-            "Navigate to URLs",
-            "Click elements",
-            "Fill form fields",
-            "Press keyboard keys",
-            "Take screenshots",
-            "Extract page content",
-            "Wait for elements",
-            "Execute JavaScript"
-        ],
-        "actions": [
-            "goto", "click", "fill", "press", "hover",
-            "screenshot", "content", "inner_text",
-            "wait_for_selector", "evaluate"
-        ],
-        "keywords": [
-            "go to", "navigate", "visit", "open",
-            "click", "press", "type", "fill", "enter",
-            "search", "submit", "screenshot", "capture",
-            "scroll", "hover", "wait for"
-        ],
-        "parameter_types": {
-            "url": "string - URL to navigate to",
-            "method": "string - Playwright method name (required)",
-            "selector": "string - CSS selector for element",
-            "args": "dict - Additional method arguments"
-        },
-        "examples": [
-            {
-                "task": "Go to google.com",
-                "subtasks": [
-                    {"tool": "playwright_execute", "action": "goto", "parameters": {"url": "https://google.com", "method": "goto", "args": {}}}
-                ]
-            },
-            {
-                "task": "Go to youtube.com and search for cats",
-                "subtasks": [
-                    {"tool": "playwright_execute", "action": "goto", "parameters": {"url": "https://youtube.com", "method": "goto", "args": {}}},
-                    {"tool": "playwright_execute", "action": "fill", "parameters": {"method": "fill", "selector": "input[name='search']", "args": {"value": "cats"}}},
-                    {"tool": "playwright_execute", "action": "press", "parameters": {"method": "press", "selector": "input[name='search']", "args": {"key": "Enter"}}}
-                ]
-            },
-            {
-                "task": "Fill form with name John and email john@example.com then submit",
-                "subtasks": [
-                    {"tool": "playwright_execute", "action": "fill", "parameters": {"method": "fill", "selector": "input[name='name']", "args": {"value": "John"}}},
-                    {"tool": "playwright_execute", "action": "fill", "parameters": {"method": "fill", "selector": "input[name='email']", "args": {"value": "john@example.com"}}},
-                    {"tool": "playwright_execute", "action": "click", "parameters": {"method": "click", "selector": "button[type='submit']", "args": {}}}
-                ]
-            }
-        ]
-    },
-    
-    "google_search": {
-        "description": "Search the web using Google",
-        "capabilities": [
-            "Web search",
-            "Find information online",
-            "Get search results with URLs"
-        ],
-        "actions": ["query"],
-        "keywords": ["search", "find", "look up", "google", "query"],
-        "parameter_types": {
-            "query": "string - Search query (required)"
-        },
-        "examples": [
-            {
-                "task": "Search for Python tutorials",
-                "subtasks": [
-                    {"tool": "google_search", "action": "query", "parameters": {"query": "Python tutorials"}}
-                ]
-            }
-        ]
-    },
-    
-    "browse_website": {
-        "description": "Scrape content from a website",
-        "capabilities": [
-            "Fetch webpage content",
-            "Extract HTML",
-            "Get page text"
-        ],
-        "actions": ["scrape"],
-        "keywords": ["browse", "scrape", "fetch", "get content from"],
-        "parameter_types": {
-            "url": "string - URL to browse (required)"
-        },
-        "examples": [
-            {
-                "task": "Get content from example.com",
-                "subtasks": [
-                    {"tool": "browse_website", "action": "scrape", "parameters": {"url": "https://example.com"}}
-                ]
-            }
-        ]
-    },
-    
-    "calculator": {
-        "description": "Perform mathematical calculations",
-        "capabilities": [
-            "Basic arithmetic",
-            "Mathematical expressions",
-            "Numerical computations"
-        ],
-        "actions": ["calculate"],
-        "keywords": ["calculate", "compute", "math", "add", "subtract", "multiply", "divide"],
-        "parameter_types": {
-            "expression": "string - Mathematical expression (required)"
-        },
-        "examples": [
-            {
-                "task": "Calculate 25 * 4 + 10",
-                "subtasks": [
-                    {"tool": "calculator", "action": "calculate", "parameters": {"expression": "25 * 4 + 10"}}
-                ]
-            }
-        ]
-    }
-}
 
 
 # Load registry at module level
@@ -185,8 +58,27 @@ def get_tool_registry() -> Dict[str, Dict[str, Any]]:
 
 
 def get_tool_capabilities(tool_name: str) -> Dict[str, Any]:
-    """Get capabilities for a specific tool."""
-    return TOOL_REGISTRY.get(tool_name, {})
+    """
+    Get essential capabilities for a specific tool (LLM-optimized).
+    Returns only the minimal information needed, not the full registry entry.
+    
+    Args:
+        tool_name: Name of the tool
+        
+    Returns:
+        Dict with only description, category, and enabled status
+    """
+    full_info = TOOL_REGISTRY.get(tool_name, {})
+    
+    if not full_info:
+        return {}
+    
+    # Return only essential fields for LLM consumption
+    return {
+        "description": full_info.get("description", ""),
+        "category": full_info.get("category", ""),
+        "enabled": full_info.get("enabled", True)
+    }
 
 
 def get_all_tool_keywords() -> Dict[str, List[str]]:

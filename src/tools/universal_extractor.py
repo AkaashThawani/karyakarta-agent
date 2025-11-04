@@ -31,16 +31,25 @@ class UniversalExtractor:
     def extract_with_tree_structure(self, html: str, limit: int = 5, required_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Synchronous wrapper for tree-based extraction.
+        Handles case where event loop is already running (e.g., from Playwright).
         """
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        import concurrent.futures
         
-        return loop.run_until_complete(self.extract_with_tree_structure_async(html, limit, required_fields))
+        # Run async code in a separate thread to avoid "event loop already running" error
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                asyncio.run,
+                self.extract_with_tree_structure_async(html, limit, required_fields)
+            )
+            return future.result()
     
-    async def extract_with_tree_structure_async(self, html: str, limit: int = 5, required_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    async def extract_with_tree_structure_async(
+        self, 
+        html: str, 
+        limit: int = 5, 
+        required_fields: Optional[List[str]] = None,
+        result_storage: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Tree-based extraction with BFS discovery + DFS extraction + flattening + BATCH STREAMING.
         
@@ -53,11 +62,13 @@ class UniversalExtractor:
         6. BATCH STREAMING: Process and yield results in batches
         7. Deduplication: Remove duplicates
         8. Global Limit: Return exactly N records
+        9. Progressive Saving: Save to external storage (survives timeout)
         
         Args:
             html: HTML string to parse
             limit: Maximum number of records to extract
             required_fields: Optional list of required field names
+            result_storage: Optional external list to progressively save results (survives timeout)
             
         Returns:
             List of flat records with exactly 'limit' items
@@ -65,81 +76,106 @@ class UniversalExtractor:
         tree = HTMLParser(html)
         print(f"[EXTRACT] 🌳 Tree-based extraction: limit={limit}")
         
-        try:
-            # Option A: Add 30-second timeout to prevent hanging on complex sites
-            async with asyncio.timeout(30):
-                # 1. Calculate adaptive depth
-                max_depth = await asyncio.to_thread(self._calculate_adaptive_depth, tree)
-                print(f"[EXTRACT] Adaptive max_depth: {max_depth}")
-                
-                # 2. BFS Discovery
-                levels = await asyncio.to_thread(self._bfs_discover_candidates, tree, max_depth)
-                print(f"[EXTRACT] Discovered {len(levels)} levels")
-                
-                # 3. Pattern Detection with caching
-                patterns = await asyncio.to_thread(self._detect_patterns_with_cache, levels)
-                print(f"[EXTRACT] Found {len(patterns)} patterns")
-        except asyncio.TimeoutError:
-            print(f"[EXTRACT] ⏱️ Tree-based extraction timeout after 30s, returning empty")
-            return []
+        # 1. Calculate adaptive depth (no timeout - fast operation)
+        max_depth = await asyncio.to_thread(self._calculate_adaptive_depth, tree)
+        print(f"[EXTRACT] Adaptive max_depth: {max_depth}")
         
-        # 4. Extract from patterns with hybrid exit + BATCH PROCESSING
+        # 2. BFS Discovery (no timeout - needed for extraction)
+        levels = await asyncio.to_thread(self._bfs_discover_candidates, tree, max_depth)
+        print(f"[EXTRACT] Discovered {len(levels)} levels")
+        
+        # 3. Pattern Detection with caching (no timeout - needed for extraction)
+        patterns = await asyncio.to_thread(self._detect_patterns_with_cache, levels)
+        print(f"[EXTRACT] Found {len(patterns)} patterns")
+        
+        # 4. Extract from patterns with 45s timeout + BATCH PROCESSING
         results = []
         batch = []
         batch_size = 5
         consecutive_no_pattern = 0
         last_level = -1
+        extraction_timeout = False
         
-        for pattern in patterns:
-            # Check if we've collected enough
-            if len(results) >= limit:
-                print(f"[EXTRACT] ✅ Reached limit: {limit}")
-                break
-            
-            # Hybrid exit: stop if no good patterns in 3 consecutive levels
-            if pattern['level'] != last_level:
-                if pattern['pattern_score'] < 0.7:
-                    consecutive_no_pattern += 1
-                else:
-                    consecutive_no_pattern = 0
-                last_level = pattern['level']
-            
-            if consecutive_no_pattern >= 3:
-                print(f"[EXTRACT] No patterns in 3 levels, stopping early")
-                break
-            
-            # Extract from each sibling in pattern
-            for sibling in pattern['siblings']:
-                if len(results) >= limit:
-                    break
-                
-                # DFS extraction with hierarchy (run in thread for CPU-intensive work)
-                tree_data = await asyncio.to_thread(self._dfs_extract_with_hierarchy, sibling)
-                
-                # Progressive flattening with path context
-                flat_record = await asyncio.to_thread(self._flatten_with_path, tree_data)
-                
-                # Map to required fields if specified
-                if required_fields:
-                    flat_record = self._map_to_fields(flat_record, required_fields)
-                
-                # Validate
-                if self._is_valid_record(flat_record):
-                    batch.append(flat_record)
+        print(f"[EXTRACT] 🚀 Starting extraction loop (45s timeout)")
+        patterns_processed = 0
+        
+        try:
+            async with asyncio.timeout(45):  # 45s timeout for extraction loop only
+                for pattern in patterns:
+                    patterns_processed += 1
                     
-                    # Process batch when it reaches batch_size
-                    if len(batch) >= batch_size:
-                        results.extend(batch)
-                        print(f"[EXTRACT] +{len(batch)} records (batch) | Total: {len(results)}")
-                        batch = []
+                    # Log progress every 10 patterns
+                    if patterns_processed % 10 == 0:
+                        print(f"[DFS] Processing pattern {patterns_processed}/{len(patterns)}, results: {len(results)}")
+                    
+                    # Check if we've collected enough
+                    if len(results) >= limit:
+                        print(f"[EXTRACT] ✅ Reached limit: {limit}")
+                        break
+                    
+                    # Hybrid exit: stop if no good patterns in 3 consecutive levels
+                    if pattern['level'] != last_level:
+                        if pattern['pattern_score'] < 0.7:
+                            consecutive_no_pattern += 1
+                        else:
+                            consecutive_no_pattern = 0
+                        last_level = pattern['level']
+                    
+                    if consecutive_no_pattern >= 3:
+                        print(f"[EXTRACT] No patterns in 3 levels, stopping early")
+                        break
+                    
+                    # Extract from each sibling in pattern
+                    for sibling_idx, sibling in enumerate(pattern['siblings']):
+                        if len(results) >= limit:
+                            break
                         
-                        # Allow other async tasks to run
-                        await asyncio.sleep(0)
+                        # Log every 20 siblings if pattern has many
+                        if len(pattern['siblings']) > 50 and sibling_idx % 20 == 0:
+                            print(f"[DFS] Pattern {patterns_processed}: processing sibling {sibling_idx}/{len(pattern['siblings'])}")
+                        
+                        # DFS extraction with hierarchy (run in thread for CPU-intensive work)
+                        tree_data = await asyncio.to_thread(self._dfs_extract_with_hierarchy, sibling)
+                        
+                        # Progressive flattening with path context
+                        flat_record = await asyncio.to_thread(self._flatten_with_path, tree_data)
+                        
+                        # Map to required fields if specified
+                        if required_fields:
+                            flat_record = self._map_to_fields(flat_record, required_fields)
+                        
+                        # Validate
+                        if self._is_valid_record(flat_record):
+                            batch.append(flat_record)
+                            
+                            # Progressive saving: Save to external storage immediately if provided
+                            if result_storage is not None:
+                                result_storage.append(flat_record)
+                                print(f"[EXTRACT] 💾 Saved record #{len(result_storage)} to storage")
+                            
+                            # Process batch when it reaches batch_size
+                            if len(batch) >= batch_size:
+                                results.extend(batch)
+                                print(f"[EXTRACT] +{len(batch)} records (batch) | Total: {len(results)}")
+                                batch = []
+                                
+                                # Allow other async tasks to run
+                                await asyncio.sleep(0)
+        
+        except asyncio.TimeoutError:
+            extraction_timeout = True
+            print(f"[EXTRACT] ⏱️ Extraction timeout after 45s")
+            print(f"[EXTRACT] 📊 Collected {len(results)} records + {len(batch)} in current batch")
+            if result_storage is not None:
+                print(f"[EXTRACT] 💾 Saved {len(result_storage)} records to storage (survives timeout)")
         
         # Add remaining batch
         if batch:
             results.extend(batch)
             print(f"[EXTRACT] +{len(batch)} records (final batch) | Total: {len(results)}")
+        
+        if extraction_timeout:
+            print(f"[EXTRACT] ⚠️ Extraction incomplete due to timeout, returning partial results")
         
         # 5. Deduplication
         results = self._deduplicate(results)
@@ -148,31 +184,32 @@ class UniversalExtractor:
         return results[:limit]
     
     def _calculate_adaptive_depth(self, tree: HTMLParser) -> int:
-        """Calculate optimal max_depth based on DOM structure"""
+        """Calculate optimal max_depth based on DOM structure - REDUCED for performance"""
         try:
             # Sample nodes to estimate average depth
             all_nodes = tree.css('*')
-            sample_size = min(100, len(all_nodes))
+            sample_size = min(50, len(all_nodes))  # REDUCED from 100
             sample_nodes = all_nodes[:sample_size]
             
             depths = []
             for node in sample_nodes:
                 depth = 0
                 current = node
-                while current.parent and depth < 20:  # Safety limit
+                while current.parent and depth < 12:  # REDUCED from 20
                     depth += 1
                     current = current.parent
                 depths.append(depth)
             
             if depths:
                 avg_depth = sum(depths) / len(depths)
-                adaptive_depth = min(10, int(avg_depth) + 2)
+                # OPTIMIZATION: Cap at 6 instead of 10 for faster extraction
+                adaptive_depth = min(6, int(avg_depth))
                 return adaptive_depth
             
         except Exception as e:
             print(f"[EXTRACT] Depth calculation failed: {e}")
         
-        return 8  # Reasonable default
+        return 5  # REDUCED from 8 - shallower trees are faster
     
     def _create_fingerprint(self, node) -> str:
         """Create structural fingerprint for fast comparison"""
@@ -202,13 +239,25 @@ class UniversalExtractor:
                 ...
             }
         """
+        # OPTIMIZATION 1: Skip irrelevant tags and classes early
+        SKIP_TAGS = {'script', 'style', 'noscript', 'iframe', 'svg', 'path'}
+        SKIP_CLASSES = ['ad', 'advertisement', 'banner', 'cookie', 'social-share', 
+                       'newsletter', 'popup', 'modal', 'overlay']
+        
+        print("[BFS] 🌳 Starting BFS discovery (optimized)...")
         levels = {}
         queue = [(tree.root, 0, None)]  # (node, level, parent)
         visited = set()
-        MAX_QUEUE_SIZE = 1000  # Option C: Safety limit for complex DOMs
+        MAX_QUEUE_SIZE = 500  # REDUCED from 1000 for faster stopping
+        nodes_processed = 0
+        nodes_skipped = 0
         
         while queue:
-            # Option C: Check queue size to prevent runaway BFS
+            # Log progress every 100 nodes
+            if nodes_processed > 0 and nodes_processed % 100 == 0:
+                print(f"[BFS] Processed {nodes_processed} nodes ({nodes_skipped} skipped), queue: {len(queue)}, levels: {len(levels)}")
+            
+            # OPTIMIZATION 2: Check queue size more aggressively
             if len(queue) > MAX_QUEUE_SIZE:
                 print(f"[EXTRACT] ⚠️ Queue size ({len(queue)}) exceeded limit ({MAX_QUEUE_SIZE}), stopping BFS early")
                 break
@@ -221,23 +270,34 @@ class UniversalExtractor:
                 continue
             visited.add(node_id)
             
-            # NEW: Skip hidden nodes (Fix 2 - Visibility filtering)
+            # OPTIMIZATION 3: Skip irrelevant tags
+            if hasattr(node, 'tag'):
+                tag = node.tag.lower() if hasattr(node.tag, 'lower') else ''
+                if tag in SKIP_TAGS:
+                    nodes_skipped += 1
+                    continue
+            
+            # OPTIMIZATION 4: Skip irrelevant classes
             if hasattr(node, 'attributes'):
+                class_attr = node.attributes.get('class', '')
+                if any(skip_class in class_attr.lower() for skip_class in SKIP_CLASSES):
+                    nodes_skipped += 1
+                    continue
+                
                 # Check inline style for display:none or visibility:hidden
                 style = node.attributes.get('style', '') # type: ignore
                 if style:
                     style_lower = style.lower()
                     if 'display:none' in style_lower or 'display: none' in style_lower:
+                        nodes_skipped += 1
                         continue
                     if 'visibility:hidden' in style_lower or 'visibility: hidden' in style_lower:
+                        nodes_skipped += 1
                         continue
                 
-                # Check for 'hidden' class or attribute
-                class_attr = node.attributes.get('class', '')
-                if 'hidden' in class_attr.lower():
-                    continue
-                
+                # Check for 'hidden' attribute
                 if node.attributes.get('hidden') or node.attributes.get('aria-hidden') == 'true':
+                    nodes_skipped += 1
                     continue
             
             # Store node info by level
@@ -256,7 +316,10 @@ class UniversalExtractor:
                 for child in node.iter():
                     if child != node and id(child) not in visited:
                         queue.append((child, level + 1, node))
+            
+            nodes_processed += 1
         
+        print(f"[BFS] ✅ Complete: {nodes_processed} nodes ({nodes_skipped} skipped), {len(levels)} levels")
         return levels
     
     def _detect_patterns_with_cache(self, levels: Dict[int, List[Dict]]) -> List[Dict]:
@@ -269,6 +332,7 @@ class UniversalExtractor:
         Returns:
             List of detected patterns sorted by score
         """
+        print("[PATTERN] 🔍 Starting pattern detection...")
         patterns = []
         
         for level_num, nodes in levels.items():
@@ -307,7 +371,9 @@ class UniversalExtractor:
                     })
         
         # Sort by score (best patterns first)
-        return sorted(patterns, key=lambda p: p['pattern_score'], reverse=True)
+        sorted_patterns = sorted(patterns, key=lambda p: p['pattern_score'], reverse=True)
+        print(f"[PATTERN] ✅ Found {len(sorted_patterns)} patterns")
+        return sorted_patterns
     
     def _calculate_similarity_fast(self, fingerprints: List[str]) -> float:
         """Fast similarity calculation using fingerprints"""

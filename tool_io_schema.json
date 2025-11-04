@@ -56,6 +56,7 @@
         "required": true,
         "description": "URL to extract data from",
         "accepts_from": [
+          "google_search.urls[{subtask_index}]",
           "google_search.urls[0]",
           "playwright_execute.current_url"
         ],

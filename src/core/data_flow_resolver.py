@@ -66,7 +66,8 @@ class DataFlowResolver:
         self,
         tool_name: str,
         provided_params: Dict[str, Any],
-        accumulated_data: Dict[str, Dict[str, Any]]
+        accumulated_data: Dict[str, Dict[str, Any]],
+        subtask_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Automatically resolve missing required inputs.
@@ -340,50 +341,60 @@ class DataFlowResolver:
     def _extract_from_source(
         self,
         source_path: str,
-        accumulated_data: Dict[str, Dict[str, Any]]
+        accumulated_data: Dict[str, Dict[str, Any]],
+        subtask_context: Optional[Dict[str, Any]] = None
     ) -> Optional[Any]:
         """
-        Extract value from source path like "google_search.urls[0]".
-        
+        Extract value from source path like "google_search.urls[0]" or "google_search.urls[{subtask_index}]".
+
         Source path format: "tool_name.output_field[index]"
         - tool_name: Name of previous tool
         - output_field: Name of output field from that tool
-        - [index]: Optional array index (e.g., [0] for first item)
-        
+        - [index]: Optional array index (e.g., [0] for first item, [{subtask_index}] for dynamic indexing)
+
         Args:
             source_path: Path specification
             accumulated_data: Dict of previous tool results
-            
+            subtask_context: Optional context with subtask_index for dynamic indexing
+
         Returns:
             Extracted value or None if not found
         """
-        # Parse source path: "tool_name.field[index]"
-        match = re.match(r'(\w+)\.(\w+)(?:\[(\d+)\])?', source_path)
+        # Handle dynamic placeholders in source path
+        processed_path = source_path
+        if subtask_context and "subtask_index" in subtask_context:
+            subtask_index = subtask_context["subtask_index"]
+            # Replace {subtask_index} with actual index (adjust for 0-based vs 1-based)
+            # Subtask 2 (index 1) should get urls[1], subtask 3 (index 2) should get urls[2], etc.
+            processed_path = processed_path.replace("{subtask_index}", str(subtask_index - 1))
+
+        # Parse processed source path: "tool_name.field[index]"
+        match = re.match(r'(\w+)\.(\w+)(?:\[(\d+)\])?', processed_path)
         if not match:
-            print(f"[DataFlowResolver] Invalid source path format: {source_path}")
+            print(f"[DataFlowResolver] Invalid source path format: {processed_path} (original: {source_path})")
             return None
-        
+
         tool_name, field, index = match.groups()
-        
+
         # Find matching tool result in accumulated_data
         # accumulated_data keys are like "step_0_google_search", "step_1_chart_extractor"
         for step_name, step_data in accumulated_data.items():
             if tool_name not in step_name:
                 continue
-            
+
             # Get extracted data (structured outputs)
             extracted = step_data.get("extracted", {})
             value = extracted.get(field)
-            
+
             if value is None:
                 # Try raw result as fallback
                 raw_result = step_data.get("result", {})
                 if isinstance(raw_result, dict):
                     value = raw_result.get("data", {}).get(field)
-            
+
             if value is None:
                 continue
-            
+
             # Handle array indexing
             if index is not None:
                 if isinstance(value, list):
@@ -391,14 +402,14 @@ class DataFlowResolver:
                     if 0 <= idx < len(value):
                         return value[idx]
                     else:
-                        print(f"[DataFlowResolver] Index {idx} out of range for {source_path}")
+                        print(f"[DataFlowResolver] Index {idx} out of range for {processed_path} (list has {len(value)} items)")
                         return None
                 else:
-                    print(f"[DataFlowResolver] Cannot index non-list value for {source_path}")
+                    print(f"[DataFlowResolver] Cannot index non-list value for {processed_path}")
                     return None
-            
+
             return value
-        
+
         # Not found in any step
         return None
     
