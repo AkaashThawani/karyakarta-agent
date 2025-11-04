@@ -132,14 +132,14 @@ class PlaywrightChartExtractor:
     ) -> List[Dict[str, Any]]:
         """
         Extract chart data using multi-layer approach.
-        
+
         Args:
             page: Playwright page instance
-            url: URL to extract from
+            url: URL to extract from (can be string or list - takes first if list)
             required_fields: List of field names to extract
             limit: Maximum number of records (enables early termination)
             result_storage: Optional external list to progressively save results (survives timeout)
-        
+
         Priority:
         1. UniversalExtractor (extract EVERYTHING, then search)
         2. pandas.read_html() (tables only)
@@ -148,6 +148,19 @@ class PlaywrightChartExtractor:
         5. Heuristic patterns (fallback)
         6. LLM extraction (last resort)
         """
+        # Handle URL parameter - can be string or list (take first if list)
+        if isinstance(url, list):
+            if url:
+                url = url[0]  # Take first URL
+                print(f"[EXTRACT] Received URL list, using first: {url}")
+            else:
+                print(f"[EXTRACT] Received empty URL list")
+                return []
+
+        if not isinstance(url, str):
+            print(f"[EXTRACT] Invalid URL type: {type(url)}, expected string")
+            return []
+
         domain = urlparse(url).netloc
         
         print(f"\n[EXTRACT] Starting extraction from {domain}")

@@ -143,8 +143,8 @@ class DataFlowResolver:
             
             # Try each source path in order
             for source_path in accepts_from:
-                value = self._extract_from_source(source_path, accumulated_data)
-                
+                value = self._extract_from_source(source_path, accumulated_data, subtask_context)
+
                 if value is not None:
                     resolved_params[input_name] = value
                     print(f"[DataFlowResolver] ✓ Resolved {tool_name}.{input_name} ← {source_path}")

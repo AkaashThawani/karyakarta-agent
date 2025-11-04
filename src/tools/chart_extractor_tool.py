@@ -247,13 +247,31 @@ class ChartExtractorTool(BaseTool):
             if not page and url:
                 print(f"[CHART_TOOL] Creating fallback browser instance")
                 from playwright.async_api import async_playwright
-                
+
                 playwright_instance = await async_playwright().start()
                 browser_instance = await playwright_instance.chromium.launch(headless=True)
                 page = await browser_instance.new_page()
                 page.set_default_timeout(60000)  # 60 second timeout
                 should_close = True
-                
+
+                # Handle URL parameter - can be string or list (take first if list)
+                if isinstance(url, list):
+                    if url:
+                        url = url[0]  # Take first URL
+                        print(f"[CHART_TOOL] Received URL list, using first: {url}")
+                    else:
+                        print(f"[CHART_TOOL] Received empty URL list")
+                        return ToolResult(
+                            success=False,
+                            error="Empty URL list provided"
+                        )
+
+                if not isinstance(url, str):
+                    return ToolResult(
+                        success=False,
+                        error=f"Invalid URL type: {type(url)}, expected string"
+                    )
+
                 # Navigate to URL
                 print(f"[CHART_TOOL] Navigating to {url}")
                 await page.goto(url, wait_until="domcontentloaded")  # Faster load
@@ -267,7 +285,7 @@ class ChartExtractorTool(BaseTool):
                     )
                 
                 # Get current URL if not provided
-                if not url:
+                if not url and page:
                     url = page.url
                 
                 # Add timestamp logging
@@ -310,6 +328,13 @@ class ChartExtractorTool(BaseTool):
                 # Extract data with 60 second timeout and progressive saving
                 try:
                     start_extract = time.time()
+                    # Ensure url is a string (should be by this point)
+                    if not isinstance(url, str):
+                        return ToolResult(
+                            success=False,
+                            error=f"URL must be a string, got {type(url)}"
+                        )
+
                     records = await asyncio.wait_for(
                         self.extractor.extract_chart(
                             page=page,

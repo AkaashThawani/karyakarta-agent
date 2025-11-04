@@ -248,7 +248,7 @@ class UniversalExtractor:
         levels = {}
         queue = [(tree.root, 0, None)]  # (node, level, parent)
         visited = set()
-        MAX_QUEUE_SIZE = 500  # REDUCED from 1000 for faster stopping
+        MAX_QUEUE_SIZE = 1000  # REDUCED from 1000 for faster stopping
         nodes_processed = 0
         nodes_skipped = 0
         
