@@ -37,6 +37,7 @@ class ToolResult(BaseModel):
     data: Any = Field(default=None, description="The result data")
     error: Optional[str] = Field(default=None, description="Error message if failed")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    observation: Optional[Dict[str, Any]] = Field(default=None, description="Observation data for replanning (page state, available actions, etc.)")
     
     class Config:
         json_schema_extra = {

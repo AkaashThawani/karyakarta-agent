@@ -582,11 +582,47 @@ Return JSON:
     "query_params": {{}},
     "required_tools": ["tool1"],
     "required_fields": ["field1"],
+    "execution_mode": {{
+        "validation_frequency": "per_step|end_only|never",
+        "replan_on_failure": true|false,
+        "max_replans": 3
+    }},
     "task_structure": {{
-        "type": "single|sequential",
-        "steps": [{{"tool": "tool1", "parameters": {{}}}}]
+        "type": "single|sequential|adaptive",
+        "steps": [{{"tool": "tool1", "parameters": {{}}}}],
+        "goal": "original user goal (required for adaptive)"
     }}
 }}
+
+**Execution Mode Configuration**:
+- validation_frequency: 
+  * "per_step" - Validate after each step (for complex/unknown sites)
+  * "end_only" - Validate only final result (for simple/known workflows)
+  * "never" - Skip validation (for trusted operations)
+- replan_on_failure:
+  * true - Trigger replanning when validation fails
+  * false - Continue with original plan even if steps fail
+- max_replans: Maximum replanning attempts (1-5, typically 3)
+
+**Task Structure Types**:
+- "single": One tool call, no dependencies (e.g., "calculate 2+2")
+- "sequential": Multiple predetermined steps with known structure
+- "adaptive": Unknown page structure, need to explore and adapt (use for: "go to X.com and do Y", unknown websites, complex forms)
+
+**Use "adaptive" when**:
+- Visiting unknown websites
+- User says "go to X and find/do Y" 
+- Complex navigation required
+- Form filling on unknown sites
+- React/JavaScript-heavy sites
+
+**Execution Mode Guidelines**:
+- Simple searches: validation_frequency="end_only", replan=false
+- Known sites: validation_frequency="per_step", replan=true, max_replans=2
+- Unknown sites: validation_frequency="per_step", replan=true, max_replans=3-5
+- Adaptive tasks: Always use validation_frequency="per_step", replan=true
+
+**For adaptive tasks**: Only include initial navigation step, system will plan remaining steps after observing page.
 
 RETURN ONLY VALID JSON:"""
         
@@ -1812,7 +1848,10 @@ Return ONLY valid JSON:"""
         Delegate tasks to executor agents with AUTOMATIC data flow resolution.
         Uses DataFlowResolver for zero-hardcoding parameter chaining.
 
-        NOW WITH TRUE PARALLEL EXECUTION! 🚀
+        NOW WITH ADAPTIVE EXECUTION! 🚀
+        - Detects "adaptive" task type
+        - Uses incremental planning for unknown sites
+        - Falls back to sequential with validation for known workflows
 
         Args:
             subtasks: List of subtasks to delegate
@@ -1820,6 +1859,109 @@ Return ONLY valid JSON:"""
 
         Returns:
             List of results from executors
+        """
+        # NEW: Check if this is an adaptive task
+        task_type = plan.get("task_structure", {}).get("type", "sequential") if plan else "sequential"
+        
+        if task_type == "adaptive":
+            print(f"[REASON] 🔄 Using ADAPTIVE execution (incremental planning)")
+            return self._execute_adaptive(subtasks, plan)
+        else:
+            print(f"[REASON] 📋 Using SEQUENTIAL execution (with validation)")
+            return self._execute_sequential(subtasks, plan)
+    
+    def _execute_adaptive(self, initial_steps: List[Dict[str, Any]], plan: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Execute adaptively - plan incrementally based on observations.
+        
+        Flow:
+        1. Execute initial step (usually navigation)
+        2. Observe current state (page elements)
+        3. Plan next steps based on observation
+        4. Execute next step
+        5. Repeat until goal achieved or max iterations
+        
+        Args:
+            initial_steps: Initial steps (usually just navigation)
+            plan: Execution plan with goal
+            
+        Returns:
+            List of all execution results
+        """
+        resolver = get_resolver()
+        results = []
+        accumulated_data = {}
+        
+        goal = plan.get("task_structure", {}).get("goal", plan.get("original_task_desc", "")) if plan else ""
+        max_iterations = 10  # Prevent infinite loops
+        
+        print(f"[REASON] 🎯 Adaptive execution goal: {goal}")
+        print(f"[REASON] 🎯 Starting with {len(initial_steps)} initial step(s)")
+        
+        current_steps = initial_steps
+        iteration = 0
+        
+        while iteration < max_iterations and current_steps:
+            iteration += 1
+            print(f"\n[REASON] === Adaptive Iteration {iteration}/{max_iterations} ===")
+            
+            # Execute next step
+            step = current_steps[0]
+            result = self._execute_single_subtask(step, len(results), accumulated_data, resolver, plan)
+            results.append(result)
+            
+            # Store in accumulated data
+            tool_name = step["tool"]
+            extracted_outputs = resolver.extract_outputs(tool_name=tool_name, raw_result=result["data"])
+            
+            step_name = f"step_{len(results)-1}_{tool_name}"
+            accumulated_data[step_name] = {
+                "tool": tool_name,
+                "result": result,
+                "extracted": extracted_outputs,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Check if goal achieved
+            if self._goal_achieved(results, goal, plan):
+                print(f"[REASON] ✅ Goal achieved after {iteration} iterations!")
+                break
+            
+            # Observe current state (no vision, just element list)
+            observation = self._observe_current_state(result, accumulated_data)
+            
+            # Plan next steps based on observation
+            print(f"[REASON] 🔍 Planning next steps based on current state...")
+            next_steps = self._plan_next_steps_incremental(
+                goal=goal,
+                current_observation=observation,
+                previous_results=results,
+                accumulated_data=accumulated_data
+            )
+            
+            if not next_steps:
+                print(f"[REASON] ⚠️ No more steps to plan, stopping")
+                break
+            
+            print(f"[REASON] 💡 Planned {len(next_steps)} next step(s)")
+            current_steps = next_steps
+        
+        if iteration >= max_iterations:
+            print(f"[REASON] ⚠️ Max iterations reached ({max_iterations})")
+        
+        return results
+    
+    def _execute_sequential(self, subtasks: List[Dict[str, Any]], plan: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Execute sequentially with validation and replanning.
+        This is the original execution logic with validation enhancements.
+        
+        Args:
+            subtasks: List of subtasks
+            plan: Execution plan
+            
+        Returns:
+            List of results
         """
         # Initialize DataFlowResolver for automatic data flow
         resolver = get_resolver()
@@ -1891,6 +2033,60 @@ Return ONLY valid JSON:"""
                 result = self._execute_single_subtask(
                     subtask, i, accumulated_data, resolver, plan
                 )
+                
+                # NEW: Validate step success and trigger replanning if needed
+                validation = self._validate_step_success(
+                    subtask, result, accumulated_data, plan
+                )
+                
+                if not validation['valid'] and validation['needs_replan']:
+                    print(f"[REASON] 🔄 Step {i+1} failed validation: {validation['reason']}")
+                    print(f"[REASON] 🔄 Triggering dynamic replanning...")
+                    
+                    # Trigger replanning with context
+                    new_subtasks = self._dynamic_replan(
+                        original_task_desc=plan.get('original_task_desc', subtask['description']),
+                        failed_step=subtask,
+                        validation_result=validation,
+                        context={
+                            'previous_attempt': subtask,
+                            'result': result,
+                            'accumulated_data': accumulated_data
+                        }
+                    )
+                    
+                    if new_subtasks:
+                        # Replace remaining subtasks with new plan
+                        print(f"[REASON] ✅ Generated {len(new_subtasks)} new steps via replanning")
+                        subtasks = subtasks[:i+1] + new_subtasks
+                        # Don't append this failed result, continue with new plan
+                        i += 1
+                        continue
+                    else:
+                        print(f"[REASON] ⚠️ Replanning failed, continuing with original plan")
+                
+                # NEW: Check for incomplete data and create follow-up tasks
+                if result.get("success") and result.get("metadata", {}).get("complete") == False:
+                    suggested_action = result["metadata"].get("suggested_action")
+                    reason = result["metadata"].get("reason", "Data incomplete")
+                    
+                    if suggested_action:
+                        print(f"[REASON] 📊 Step {i+1} succeeded but data incomplete: {reason}")
+                        print(f"[REASON] 🔄 Creating follow-up task: {suggested_action}")
+                        
+                        # Create follow-up task
+                        follow_up = self._create_follow_up_task(
+                            original_subtask=subtask,
+                            result=result,
+                            suggested_action=suggested_action,
+                            reason=reason
+                        )
+                        
+                        if follow_up:
+                            # Insert follow-up task after current step
+                            print(f"[REASON] ✅ Added follow-up task: {follow_up['description']}")
+                            subtasks.insert(i+1, follow_up)
+                
                 results.append(result)
 
                 # Update accumulated data
@@ -2933,6 +3129,245 @@ JSON:"""
                 'confidence': 0.5,
                 'suggested_actions': []
             }
+    
+    def _observe_current_state(self, result: Dict[str, Any], accumulated_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Observe current state after execution (no vision, element-based).
+        
+        Args:
+            result: Result from last execution
+            accumulated_data: All accumulated data
+            
+        Returns:
+            Observation dict with current state
+        """
+        # Extract current URL from result data
+        current_url = "unknown"
+        result_data = result.get("data", {})
+        if isinstance(result_data, dict):
+            current_url = result_data.get("url", "unknown")
+        
+        observation = {
+            "last_tool": result.get("tool", "unknown"),
+            "last_success": result.get("success", False),
+            "data_available": bool(result.get("data")),
+            "current_url": current_url,
+            "metadata": result.get("metadata", {})
+        }
+        
+        # Extract useful context from metadata
+        if "observation" in result.get("metadata", {}):
+            observation["page_state"] = result["metadata"]["observation"]
+        
+        print(f"[REASON] 📊 Current state: tool={observation['last_tool']}, success={observation['last_success']}, url={current_url}")
+        
+        return observation
+    
+    def _plan_next_steps_incremental(
+        self,
+        goal: str,
+        current_observation: Dict[str, Any],
+        previous_results: List[Dict[str, Any]],
+        accumulated_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Plan next steps incrementally based on current observation.
+        Uses LLM to decide what to do next.
+        
+        Args:
+            goal: Original goal
+            current_observation: Current state observation
+            previous_results: Results so far
+            accumulated_data: All accumulated data
+            
+        Returns:
+            List of next subtasks (1-3 steps)
+        """
+        if not self.llm_service:
+            print("[REASON] No LLM service for incremental planning")
+            return []
+        
+        # Build context from previous results
+        results_summary = []
+        for r in previous_results[-3:]:  # Last 3 results
+            results_summary.append({
+                "tool": r.get("tool"),
+                "success": r.get("success"),
+                "description": r.get("description", "")[:100]
+            })
+        
+        prompt = f"""Plan next 1-3 steps to achieve the goal based on current state.
+
+Goal: "{goal}"
+
+Previous Steps:
+{json.dumps(results_summary, indent=2)}
+
+Current State:
+- Last tool: {current_observation.get('last_tool')}
+- Success: {current_observation.get('last_success')}
+- Current URL: {current_observation.get('current_url', 'unknown')}
+- Has data: {current_observation.get('data_available')}
+
+**IMPORTANT**: If Current URL shows we're already at the target page, DON'T navigate again! Move to next action (click, fill, extract, etc.).
+
+**CRITICAL: Tool Parameter Formats**
+
+playwright_execute (MOST COMMON):
+- REQUIRED: method (goto, click, fill, press, wait_for_timeout, text_content, etc.)
+- Optional: selector (for click, fill, press)
+- Optional: args (method-specific, e.g., {{"value": "text"}} for fill, {{"key": "Enter"}} for press)
+
+Examples:
+1. Fill search box:
+   {{"tool": "playwright_execute", "parameters": {{"method": "fill", "selector": "input[name='q']", "args": {{"value": "OnePlus trimmer"}}}}, "description": "Search for OnePlus trimmer"}}
+
+2. Press Enter:
+   {{"tool": "playwright_execute", "parameters": {{"method": "press", "selector": "input[name='q']", "args": {{"key": "Enter"}}}}, "description": "Submit search"}}
+
+3. Wait for page:
+   {{"tool": "playwright_execute", "parameters": {{"method": "wait_for_timeout", "args": {{"timeout": 3000}}}}, "description": "Wait 3s for results"}}
+
+4. Extract text:
+   {{"tool": "playwright_execute", "parameters": {{"method": "text_content", "selector": "body"}}, "description": "Get page content"}}
+
+chart_extractor:
+- REQUIRED: required_fields (array of field names)
+- Optional: limit (number of records)
+
+Example:
+{{"tool": "chart_extractor", "parameters": {{"required_fields": ["name", "price", "rating"], "limit": 10}}, "description": "Extract products"}}
+
+What should we do next to achieve the goal?
+
+Return JSON array of 1-3 next steps:
+[
+  {{"tool": "tool_name", "parameters": {{"method": "...", ...}}, "description": "what this does"}}
+]
+
+If goal is achieved, return empty array: []
+
+RETURN ONLY VALID JSON ARRAY:"""
+        
+        try:
+            model = self.llm_service.get_model()
+            response = model.invoke(prompt)
+            content = response.content.strip()
+            
+            import re
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            if json_match:
+                steps_data = json.loads(json_match.group())
+                
+                # Convert to subtask format
+                next_subtasks = []
+                base_id = f"adaptive_{len(previous_results)}"
+                
+                for idx, step_data in enumerate(steps_data):
+                    subtask = {
+                        "subtask_id": f"{base_id}_step_{idx}",
+                        "tool": step_data.get("tool", ""),
+                        "parameters": step_data.get("parameters", {}),
+                        "description": step_data.get("description", "")
+                    }
+                    next_subtasks.append(subtask)
+                
+                return next_subtasks
+            
+            return []
+            
+        except Exception as e:
+            print(f"[REASON] Incremental planning failed: {e}")
+            return []
+    
+    def _goal_achieved(self, results: List[Dict[str, Any]], goal: str, plan: Optional[Dict[str, Any]]) -> bool:
+        """
+        Check if goal achieved using EXISTING completeness infrastructure.
+        ZERO HARDCODING - delegates to ResultValidator and completeness checks.
+        
+        Args:
+            results: Execution results so far
+            goal: Original goal
+            plan: Execution plan
+            
+        Returns:
+            True if goal achieved
+        """
+        # Safety: Prevent infinite loops
+        if len(results) >= 8:
+            print(f"[REASON] ⚠️ Reached result limit (8), considering goal achieved")
+            return True
+        
+        # Get required fields from plan
+        required_fields = plan.get("required_fields", []) if plan else []
+        
+        # Collect all successful results with data
+        successful_with_data = [
+            r for r in results 
+            if r.get("success") and r.get("data")
+        ]
+        
+        if not successful_with_data:
+            print(f"[REASON] No successful results with data yet")
+            return False
+        
+        # If we have required fields, use existing ResultValidator
+        if required_fields:
+            try:
+                from src.routing.result_validator import ResultValidator
+                
+                # Extract data from results
+                all_data = []
+                for r in successful_with_data:
+                    data = r.get("data")
+                    if isinstance(data, list):
+                        all_data.extend(data)
+                    elif isinstance(data, dict):
+                        all_data.append(data)
+                
+                if all_data:
+                    validator = ResultValidator()
+                    validation = validator.validate(
+                        all_data,
+                        required_fields,
+                        None
+                    )
+                    
+                    is_complete = validation.get("complete", False)
+                    coverage = validation.get("coverage", 0.0)
+                    
+                    if is_complete:
+                        print(f"[REASON] ✅ Goal achieved: data complete (coverage: {coverage*100:.0f}%)")
+                        return True
+                    else:
+                        print(f"[REASON] Goal not achieved: coverage {coverage*100:.0f}%, missing {validation.get('missing_fields')}")
+                        return False
+            except Exception as e:
+                print(f"[REASON] Completeness check failed: {e}")
+        
+        # Fallback: Check if we have substantial data
+        # (for tasks without specific required fields, like "click and return text")
+        last_result = results[-1]
+        
+        # Check if last result has completeness metadata from executor
+        if last_result.get("metadata", {}).get("complete") is not None:
+            is_complete = last_result["metadata"].get("complete", False)
+            if is_complete:
+                print(f"[REASON] ✅ Goal achieved: executor marked as complete")
+                return True
+        
+        # Check if we have meaningful data
+        has_meaningful_data = (
+            last_result.get("success") and
+            last_result.get("data") and
+            len(str(last_result.get("data"))) > 100
+        )
+        
+        if has_meaningful_data:
+            print(f"[REASON] ✅ Goal achieved: has meaningful data")
+            return True
+        
+        return False
     
     def plan_multi_step_extraction(
         self,

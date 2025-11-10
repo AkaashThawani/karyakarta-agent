@@ -22,6 +22,7 @@ from datetime import datetime
 import json
 import re
 import asyncio
+import time
 
 
 class PatternCache:
@@ -122,6 +123,11 @@ class PlaywrightChartExtractor:
             print(f"[EXTRACT] Learning Manager not available: {e}")
             self.learning_manager = None
     
+    def _format_timestamp(self) -> str:
+        """Format timestamp to match chart_tool format: HH:MM:SS.mmm"""
+        t = time.time()
+        return f"{time.strftime('%H:%M:%S', time.localtime(t))}.{int((t % 1) * 1000):03d}"
+    
     async def extract_chart(
         self,
         page: Page,
@@ -169,10 +175,12 @@ class PlaywrightChartExtractor:
         # NEW: Check if page actually loaded (Fix for failed playwright_execute navigation)
         current_url = page.url
         if current_url == "about:blank" or domain not in current_url:
-            print(f"[EXTRACT] ⚠️ Page not loaded (URL: {current_url}), navigating now...")
+            nav_start = time.time()
+            print(f"[EXTRACT] ⏱️ {self._format_timestamp()} - Page not loaded (URL: {current_url}), navigating now...")
             try:
                 await page.goto(url, wait_until='domcontentloaded', timeout=10000)
-                print(f"[EXTRACT] ✅ Navigation successful")
+                nav_duration = time.time() - nav_start
+                print(f"[EXTRACT] ⏱️ {self._format_timestamp()} - Navigation successful in {nav_duration:.2f}s")
             except Exception as nav_error:
                 print(f"[EXTRACT] ❌ Navigation failed: {nav_error}")
                 raise Exception(f"Failed to navigate to {url}: {nav_error}")
@@ -183,7 +191,7 @@ class PlaywrightChartExtractor:
         except:
             pass  # Continue anyway
         
-        print(f"[EXTRACT] ✅ Page ready, starting extraction")
+        print(f"[EXTRACT] ⏱️ {self._format_timestamp()} - Page ready, starting extraction")
         
         # NEW: Step 0 - Check for cached selectors from Site Intelligence V2
         if self.site_intelligence:

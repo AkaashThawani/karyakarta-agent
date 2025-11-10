@@ -25,6 +25,7 @@ from src.tools.analysis_tools import (
 )
 from src.tools.playwright_universal import UniversalPlaywrightTool
 from src.tools.chart_extractor_tool import ChartExtractorTool
+from src.tools.content_extractor_tool import ContentExtractorTool
 from src.tools.api_call import APICallTool
 
 load_dotenv()
@@ -104,10 +105,13 @@ def create_tools_for_session(session_id: str):
     
     # Initialize Universal Playwright Tool
     universal_playwright_tool = UniversalPlaywrightTool(session_id, logger, settings)
-    
-    # Initialize Chart Extractor Tool
-    chart_extractor_tool = ChartExtractorTool()
-    
+
+    # Initialize Content Extractor Tool (fast, clean content extraction)
+    content_extractor_tool = ContentExtractorTool(logger)
+
+    # Chart Extractor Tool disabled - replaced by ContentExtractor
+    # chart_extractor_tool = ChartExtractorTool()
+
     # Initialize API Call Tool
     api_call_tool = APICallTool()
     
@@ -124,8 +128,8 @@ def create_tools_for_session(session_id: str):
         validate_data_tool,
         # Universal Playwright Tool (dynamic method execution)
         universal_playwright_tool,
-        # Chart Extractor Tool (structured data extraction)
-        chart_extractor_tool,
+        # Content Extractor Tool (fast, clean content extraction)
+        content_extractor_tool,
         # API Call Tool (HTTP requests for APIs)
         api_call_tool,
     ]

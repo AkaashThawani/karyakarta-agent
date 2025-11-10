@@ -26,6 +26,10 @@ from .chart_extractor_tool import ChartExtractorTool
 from .element_parser import ElementParser
 from .site_intelligence import SiteIntelligenceTool
 
+# Import content extractor
+from .content_extractor import ContentExtractor
+from .content_extractor_tool import ContentExtractorTool
+
 # Import learning manager
 from .learning_manager import LearningManager, get_learning_manager
 
@@ -44,7 +48,11 @@ __all__ = [
     # Playwright tools
     'UniversalPlaywrightTool',
     'ChartExtractorTool',
-    
+
+    # Content extractor
+    'ContentExtractor',
+    'ContentExtractorTool',
+
     # Helper classes (used by tools)
     'PlaywrightChartExtractor',
     'ElementParser',

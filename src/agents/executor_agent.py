@@ -125,15 +125,28 @@ class ExecutorAgent(BaseAgent):
                         "complete": completeness["complete"],
                         "completeness_reason": completeness.get("reason"),
                         "suggested_action": completeness.get("next_action"),
-                        "coverage": completeness.get("coverage", "100%")
+                        "coverage": completeness.get("coverage", "100%"),
+                        # NEW: Pass observation data from tool if available
+                        "observation": tool_result.observation if hasattr(tool_result, 'observation') and tool_result.observation else {}
                     }
                 )
             else:
+                # NEW: Classify error and signal replanning need
+                error_type = self._classify_error(tool_result.error)
+                needs_replanning = self._is_recoverable_error(error_type)
+                
                 return AgentResult.error_result(
                     error=tool_result.error or "Tool execution failed",
                     agent_id=self.agent_id,
                     execution_time=execution_time,
-                    metadata={"tool": tool.name}
+                    metadata={
+                        "tool": tool.name,
+                        "error_type": error_type,
+                        "needs_replanning": needs_replanning,
+                        "replanning_reason": error_type,
+                        # NEW: Pass observation data from tool if available
+                        "observation": tool_result.observation if hasattr(tool_result, 'observation') and tool_result.observation else {}
+                    }
                 )
                 
         except Exception as e:
@@ -454,6 +467,69 @@ class ExecutorAgent(BaseAgent):
             "failed_executions": 0,
             "by_tool": {}
         }
+    
+    def _classify_error(self, error: Optional[str]) -> str:
+        """
+        Classify error type for intelligent handling.
+        
+        Args:
+            error: Error message
+            
+        Returns:
+            Error type: selector_not_found, timeout, network, validation, unknown
+        """
+        if not error:
+            return "unknown"
+        
+        error_lower = error.lower()
+        
+        # Selector/element not found
+        if any(keyword in error_lower for keyword in ['selector', 'locator', 'element not found', 'no such element']):
+            return "selector_not_found"
+        
+        # Timeout errors
+        if any(keyword in error_lower for keyword in ['timeout', 'timed out', 'exceeded']):
+            return "timeout"
+        
+        # Network errors
+        if any(keyword in error_lower for keyword in ['network', 'connection', 'dns', 'refused']):
+            return "network"
+        
+        # Validation errors
+        if any(keyword in error_lower for keyword in ['validation', 'invalid', 'required']):
+            return "validation"
+        
+        # Navigation errors
+        if any(keyword in error_lower for keyword in ['navigation', 'page', 'load']):
+            return "navigation"
+        
+        return "unknown"
+    
+    def _is_recoverable_error(self, error_type: str) -> bool:
+        """
+        Determine if error is recoverable through replanning.
+        
+        Args:
+            error_type: Error type from _classify_error
+            
+        Returns:
+            True if error is recoverable (should trigger replanning)
+        """
+        # Recoverable errors - these can be fixed by trying a different approach
+        recoverable = {
+            "selector_not_found",  # Try different selector or approach
+            "timeout",  # Try with longer timeout or different method
+            "navigation"  # Try different navigation approach
+        }
+        
+        # Non-recoverable errors - these need user intervention or won't be fixed by replanning
+        non_recoverable = {
+            "validation",  # Wrong parameters provided
+            "network",  # Network issues (may be temporary but not fixable by agent)
+            "unknown"  # Unknown errors - don't replan blindly
+        }
+        
+        return error_type in recoverable
     
     def execute_tool_directly(
         self,

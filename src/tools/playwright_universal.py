@@ -17,6 +17,7 @@ import asyncio
 import threading
 import json
 import os
+import time
 
 
 class PlaywrightExecuteInput(BaseModel):
@@ -130,6 +131,136 @@ class UniversalPlaywrightTool(BaseTool):
         
         future = asyncio.run_coroutine_threadsafe(coro, loop)
         return future.result()
+    
+    async def _observe_page_state(self) -> Dict[str, Any]:
+        """
+        Observe current page state using screenshot + vision.
+        Captures screenshot and analyzes with Gemini vision.
+        
+        Returns:
+            Observation dict with:
+            - screenshot (base64)
+            - url, title
+            - elements (from vision analysis)
+            - page_type
+            - suggested_actions
+        """
+        if not self._page:
+            return {"error": "No page available"}
+        
+        try:
+            import base64
+            
+            # Capture screenshot
+            screenshot_bytes = await self._page.screenshot()
+            screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
+            
+            # Get basic page info
+            url = self._page.url
+            title = await self._page.title()
+            
+            # Analyze screenshot with vision
+            vision_analysis = await self._analyze_screenshot_with_vision(screenshot_b64, url, title)
+            
+            observation = {
+                "screenshot": screenshot_b64,
+                "url": url,
+                "title": title,
+                "timestamp": time.time(),
+                **vision_analysis  # Add vision analysis results
+            }
+            
+            print(f"[PLAYWRIGHT] 📸 Captured page observation with vision analysis")
+            
+            return observation
+            
+        except Exception as e:
+            print(f"[PLAYWRIGHT] Failed to observe page state: {e}")
+            return {
+                "error": str(e),
+                "url": self._page.url if self._page else "unknown",
+                "timestamp": time.time()
+            }
+    
+    async def _analyze_screenshot_with_vision(
+        self, 
+        screenshot_b64: str, 
+        url: str, 
+        title: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze screenshot using Gemini vision to identify elements.
+        
+        Args:
+            screenshot_b64: Base64 encoded screenshot
+            url: Current URL
+            title: Page title
+            
+        Returns:
+            Analysis with identified elements and suggestions
+        """
+        try:
+            from src.services.llm_service import LLMService
+            from src.core.config import settings
+            from langchain_core.messages import HumanMessage
+            
+            llm_service = LLMService(settings)
+            
+            prompt = """Analyze this webpage screenshot and identify interactive elements.
+
+Describe what you see:
+1. Search boxes (location, placeholders, nearby text)
+2. Buttons (text, purpose, location)
+3. Input fields (type, labels, placeholders)
+4. Forms (purpose, fields visible)
+5. Navigation elements (menus, links)
+6. Page type (homepage, search results, detail page, form page)
+7. Main content area
+
+Return JSON:
+{
+  "page_type": "homepage|search_results|detail_page|form_page",
+  "search_elements": [{"type": "input", "placeholder": "...", "location": "top-right"}],
+  "buttons": [{"text": "...", "purpose": "...", "location": "..."}],
+  "forms": [{"purpose": "...", "fields": [...]}],
+  "suggested_actions": ["click search icon", "fill location", etc],
+  "main_content": "description of main content visible"
+}
+
+Return ONLY valid JSON:"""
+            
+            # Create message with image
+            message = HumanMessage(
+                content=[
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url", 
+                        "image_url": {"url": f"data:image/png;base64,{screenshot_b64}"}
+                    }
+                ]
+            )
+            
+            # Get vision-enabled model
+            model = llm_service.get_model()
+            response = await asyncio.to_thread(model.invoke, [message])
+            
+            content = response.content if hasattr(response, 'content') else str(response)
+            
+            # Parse JSON response
+            import re
+            content_str = str(content) if content else ""
+            json_match = re.search(r'\{.*\}', content_str, re.DOTALL)
+            if json_match:
+                analysis = json.loads(json_match.group())
+                print(f"[PLAYWRIGHT] 🤖 Vision analysis: page_type={analysis.get('page_type')}")
+                return analysis
+            else:
+                print(f"[PLAYWRIGHT] ⚠️ Could not parse vision response")
+                return {"page_type": "unknown", "suggested_actions": []}
+            
+        except Exception as e:
+            print(f"[PLAYWRIGHT] Vision analysis failed: {e}")
+            return {"page_type": "unknown", "error": str(e)}
     
     @classmethod
     def stop_all_loops(cls):
@@ -641,9 +772,9 @@ class UniversalPlaywrightTool(BaseTool):
                 
                 self._page = await self._browser.new_page()
                 
-                # Set global 10 second timeout for all operations
-                self._page.set_default_timeout(10000)
-                print(f"[PLAYWRIGHT] ✅ Browser created successfully with 10s timeout - browser={self._browser is not None}, page={self._page is not None}")
+                # Set global 30 second timeout for modern sites (React, JavaScript-heavy)
+                self._page.set_default_timeout(30000)
+                print(f"[PLAYWRIGHT] ✅ Browser created successfully with 30s timeout - browser={self._browser is not None}, page={self._page is not None}")
                 
                 # Notify frontend that browser is active
                 if self.logger:
@@ -844,6 +975,7 @@ class UniversalPlaywrightTool(BaseTool):
                     "success": True,
                     "action": "clicked element",
                     "selector": selector,
+                    "url": self._page.url if self._page else "unknown",
                     "message": f"Successfully clicked element"
                 }
             elif method == "press" and args:

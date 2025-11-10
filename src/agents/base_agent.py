@@ -332,6 +332,7 @@ class AgentResult(BaseModel):
     error: Optional[str] = Field(default=None, description="Error message if failed")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     timestamp: datetime = Field(default_factory=datetime.now)
+    validation: Optional[Dict[str, Any]] = Field(default=None, description="Validation results (valid, reason, needs_replan)")
     
     def to_dict(self) -> Dict[str, Any]:
         """

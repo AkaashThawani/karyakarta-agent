@@ -48,7 +48,8 @@
     "metadata": {
       "category": "extraction",
       "description": "Extract structured data (tables, lists, charts) from webpages",
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "enabled": false
     },
     "inputs": {
       "url": {
@@ -356,6 +357,47 @@
         "type": "integer",
         "description": "Number of rows exported",
         "extractor": "count_records"
+      }
+    }
+  },
+
+  "content_extractor": {
+    "metadata": {
+      "category": "extraction",
+      "description": "Extract clean, readable content from web pages",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "URL to extract content from",
+        "validation": {
+          "pattern": "^https?://.+"
+        },
+        "examples": ["https://example.com/article", "https://news.ycombinator.com"]
+      }
+    },
+    "outputs": {
+      "content": {
+        "type": "string",
+        "description": "Clean, readable text content with HTML clutter removed",
+        "extractor": "identity"
+      },
+      "title": {
+        "type": "string",
+        "description": "Page title",
+        "extractor": "extract_title"
+      },
+      "word_count": {
+        "type": "integer",
+        "description": "Number of words in extracted content",
+        "extractor": "count_words"
+      },
+      "extraction_time": {
+        "type": "number",
+        "description": "Time taken for extraction in seconds",
+        "extractor": "extract_timing"
       }
     }
   }

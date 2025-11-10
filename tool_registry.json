@@ -32,7 +32,7 @@
   
   "chart_extractor": {
     "description": "Extract structured data (tables, lists, charts) from webpages with specified fields",
-    "enabled": true,
+    "enabled": false,
     "category": "extraction",
     "parameter_format": {
       "url": "string (required) - URL to extract from",
@@ -60,6 +60,15 @@
     "category": "utility",
     "parameter_format": {
       "expression": "string (required) - Mathematical expression"
+    }
+  },
+
+  "content_extractor": {
+    "description": "Extract clean, readable content from web pages for research and analysis. Removes scripts, styles, and HTML clutter while preserving semantic content.",
+    "enabled": true,
+    "category": "extraction",
+    "parameter_format": {
+      "url": "string (required) - URL to extract content from"
     }
   },
   
