@@ -16,6 +16,9 @@ Usage:
 
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_logic import run_agent_task, cancel_task
 from src.models.message import TaskRequest, TaskResponse
 

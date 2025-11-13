@@ -26,6 +26,7 @@ from src.tools.analysis_tools import (
 from src.tools.playwright_universal import UniversalPlaywrightTool
 from src.tools.chart_extractor_tool import ChartExtractorTool
 from src.tools.content_extractor_tool import ContentExtractorTool
+from src.tools.interactive_element_extractor_tool import InteractiveElementExtractorTool
 from src.tools.api_call import APICallTool
 
 load_dotenv()
@@ -109,6 +110,9 @@ def create_tools_for_session(session_id: str):
     # Initialize Content Extractor Tool (fast, clean content extraction)
     content_extractor_tool = ContentExtractorTool(logger)
 
+    # Initialize Interactive Element Extractor Tool (task-aware element extraction)
+    interactive_element_extractor_tool = InteractiveElementExtractorTool(logger)
+
     # Chart Extractor Tool disabled - replaced by ContentExtractor
     # chart_extractor_tool = ChartExtractorTool()
 
@@ -130,6 +134,8 @@ def create_tools_for_session(session_id: str):
         universal_playwright_tool,
         # Content Extractor Tool (fast, clean content extraction)
         content_extractor_tool,
+        # Interactive Element Extractor Tool (task-aware element extraction)
+        interactive_element_extractor_tool,
         # API Call Tool (HTTP requests for APIs)
         api_call_tool,
     ]

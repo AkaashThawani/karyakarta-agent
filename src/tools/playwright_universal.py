@@ -78,6 +78,7 @@ class UniversalPlaywrightTool(BaseTool):
         self.settings = settings
         self.browserless_token = os.getenv("BROWSERLESS_API_KEY", "")
         self._last_url = None  # Track URL changes for auto-learning
+        self._learned_domains = set()  # Track domains we've already learned for this session
         
         # NEW: Learning Manager
         try:
@@ -439,6 +440,11 @@ Return ONLY valid JSON:"""
         selector_hint = kwargs.get("selector_hint")
         args = kwargs.get("args", {})
         close_after = kwargs.get("close_after", False)
+
+        # Ensure args is always a dict - handle cases where decomposer passes strings
+        if not isinstance(args, dict):
+            print(f"[PLAYWRIGHT] ⚠️ Args is not dict (type: {type(args)}), converting to empty dict")
+            args = {}
         
         if not method:
             return ToolResult(
@@ -566,46 +572,74 @@ Return ONLY valid JSON:"""
                 # Check if we have any cached data for this domain
                 cache_file = selector_map.cache_dir / f"{domain}.json"
 
-                if not cache_file.exists():
-                    print(f"[PLAYWRIGHT] 🆕 New site detected: {domain} - triggering auto-learning with Site Intelligence V2")
+                if not cache_file.exists() and domain not in self._learned_domains:
+                    print(f"[PLAYWRIGHT] 🆕 New site detected: {domain} - triggering auto-learning with Interactive Element Intelligence")
+                    self._learned_domains.add(domain)
 
                     try:
-                        # Import Site Intelligence V2
-                        from src.tools.site_intelligence_v2 import SiteIntelligenceV2
-                        from src.tools.universal_extractor import UniversalExtractor
+                        # Import Interactive Element Intelligence System
+                        from src.tools.interactive_element_extractor import InteractiveElementExtractor
 
-                        # Initialize Site Intelligence V2
-                        site_intelligence = SiteIntelligenceV2()
+                        # Initialize Interactive Element Extractor
+                        element_extractor = InteractiveElementExtractor()
 
                         # Ensure page is available
                         if self._page is None:
                             print(f"[PLAYWRIGHT] ⚠️ Page not available for learning on {domain}")
                         else:
-                            # Do basic extraction to get sample data for learning
-                            html = self.run_async(self._page.content())
-                            extractor = UniversalExtractor()
+                            print(f"[PLAYWRIGHT] 🔍 Extracting interactive elements from {domain}...")
 
-                            # Extract basic data with common fields
-                            basic_records = extractor.extract_with_tree_structure(
-                                html=html,
-                                limit=5,  # Small sample for learning
-                                required_fields=["title", "description", "name", "text", "link"]
-                            )
+                            # Extract elements for multiple task types to build comprehensive database
+                            all_elements = {}
+                            task_types = ["search", "navigate", "form_fill", "extract", "click_action"]
 
-                            if basic_records and len(basic_records) >= 2:
-                                print(f"[PLAYWRIGHT] ✅ Extracted {len(basic_records)} sample records for learning")
+                            for task_type in task_types:
+                                try:
+                                    # Extract elements for this task type
+                                    result = self.run_async(element_extractor._extract_elements_async(current_url, task_type))
 
-                                # Learn selectors from the extracted data
-                                self.run_async(site_intelligence.learn_from_extraction(
-                                    self._page,
-                                    current_url,
-                                    basic_records,
-                                    ["title", "description", "name", "text", "link"]
-                                ))
+                                    if result.get('success'):
+                                        task_elements = result.get('elements', {})
+                                        # Merge elements from all task types
+                                        for category, elements_list in task_elements.items():
+                                            if category not in all_elements:
+                                                all_elements[category] = []
+                                            all_elements[category].extend(elements_list)
 
-                                print(f"[PLAYWRIGHT] 🎓 Site Intelligence V2 learned selectors for {domain}")
+                                except Exception as e:
+                                    print(f"[PLAYWRIGHT] ⚠️ Failed to extract {task_type} elements: {e}")
+                                    continue
+
+                            if all_elements and sum(len(cat) for cat in all_elements.values()) > 0:
+                                total_elements = sum(len(cat) for cat in all_elements.values())
+                                print(f"[PLAYWRIGHT] ✅ Extracted {total_elements} interactive elements across {len(all_elements)} categories")
+
+                                # Check if vector database already exists for this URL
+                                from src.tools.semantic_element_selector import get_element_selector
+                                semantic_selector = get_element_selector()
+
+                                # Check if elements already exist for this URL
+                                try:
+                                    existing_elements = semantic_selector.get_elements_by_url(current_url)
+                                    if existing_elements and len(existing_elements) > 0:
+                                        print(f"[PLAYWRIGHT] ℹ️ Vector database already exists for {domain} with {len(existing_elements)} elements - skipping storage")
+                                    else:
+                                        # Store elements in semantic database for future semantic search
+                                        stored_count = semantic_selector.store_elements(current_url, all_elements)
+                                        print(f"[PLAYWRIGHT] 🎓 Interactive Element Intelligence stored {stored_count} elements for {domain}")
+                                        print(f"[PLAYWRIGHT] 💡 Elements now available for semantic search by Reason Agent")
+                                except Exception as e:
+                                    print(f"[PLAYWRIGHT] ⚠️ Failed to check existing elements: {e}")
+                                    # Try to store anyway
+                                    try:
+                                        stored_count = semantic_selector.store_elements(current_url, all_elements)
+                                        print(f"[PLAYWRIGHT] 🎓 Interactive Element Intelligence stored {stored_count} elements for {domain}")
+                                        print(f"[PLAYWRIGHT] 💡 Elements now available for semantic search by Reason Agent")
+                                    except Exception as store_error:
+                                        print(f"[PLAYWRIGHT] ⚠️ Failed to store elements in database: {store_error}")
+
                             else:
-                                print(f"[PLAYWRIGHT] ⚠️ Insufficient data for learning on {domain}")
+                                print(f"[PLAYWRIGHT] ⚠️ No interactive elements found on {domain}")
 
                     except Exception as e:
                         print(f"[PLAYWRIGHT] ❌ Auto-learning failed for {domain}: {e}")

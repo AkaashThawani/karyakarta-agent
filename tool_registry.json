@@ -71,6 +71,21 @@
       "url": "string (required) - URL to extract content from"
     }
   },
+
+  "interactive_element_extractor": {
+    "description": "Extract interactive elements from web pages based on predefined task types (search, navigate, form_fill, extract, click_action). Returns categorized elements with selectors and attributes for semantic element matching.",
+    "enabled": true,
+    "category": "extraction",
+    "parameter_format": {
+      "url": "string (required) - URL to extract elements from",
+      "task_type": "string (required) - Task type: search, navigate, form_fill, extract, click_action"
+    },
+    "example_usage": {
+      "search_elements": {"tool": "interactive_element_extractor", "parameters": {"url": "https://example.com", "task_type": "search"}},
+      "navigation_elements": {"tool": "interactive_element_extractor", "parameters": {"url": "https://example.com", "task_type": "navigate"}},
+      "form_elements": {"tool": "interactive_element_extractor", "parameters": {"url": "https://example.com", "task_type": "form_fill"}}
+    }
+  },
   
   "excel_export": {
     "description": "Export data to Excel file (.xlsx format)",

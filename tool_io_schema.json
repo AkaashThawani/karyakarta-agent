@@ -372,6 +372,11 @@
         "type": "string",
         "required": true,
         "description": "URL to extract content from",
+        "accepts_from": [
+          "google_search.urls[0]",
+          "google_search.urls[{subtask_index}]",
+          "playwright_execute.current_url"
+        ],
         "validation": {
           "pattern": "^https?://.+"
         },
@@ -397,6 +402,81 @@
       "extraction_time": {
         "type": "number",
         "description": "Time taken for extraction in seconds",
+        "extractor": "extract_timing"
+      }
+    }
+  },
+
+  "interactive_element_extractor": {
+    "metadata": {
+      "category": "extraction",
+      "description": "Extract interactive elements based on predefined task types",
+      "version": "1.0.0"
+    },
+    "inputs": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "URL to extract interactive elements from",
+        "validation": {
+          "pattern": "^https?://.+"
+        },
+        "examples": ["https://example.com", "https://bestbuy.com"]
+      },
+      "task_type": {
+        "type": "string",
+        "required": true,
+        "description": "Task type to determine which elements to extract",
+        "enum": ["search", "navigate", "form_fill", "extract", "click_action"],
+        "examples": ["search", "navigate", "form_fill"]
+      }
+    },
+    "outputs": {
+      "inputs": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Input elements (text, email, password, etc.) with selectors and attributes",
+        "extractor": "identity"
+      },
+      "buttons": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Button elements with selectors and attributes",
+        "extractor": "identity"
+      },
+      "links": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Link elements with selectors and attributes",
+        "extractor": "identity"
+      },
+      "containers": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Container elements (tables, lists, etc.) with selectors and attributes",
+        "extractor": "identity"
+      },
+      "actions": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Action elements with selectors and attributes",
+        "extractor": "identity"
+      },
+      "tabs": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "Tab/navigation elements with selectors and attributes",
+        "extractor": "identity"
+      },
+      "lists": {
+        "type": "array",
+        "items": {"type": "object"},
+        "description": "List elements with selectors and attributes",
+        "extractor": "identity"
+      },
+      "extraction_time": {
+        "type": "number",
+        "description": "Time taken for element extraction in seconds",
         "extractor": "extract_timing"
       }
     }
