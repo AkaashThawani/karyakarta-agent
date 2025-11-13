@@ -10,11 +10,10 @@ from dotenv import load_dotenv
 
 # Import modular components
 from src.core.config import settings
-from src.core.agent import AgentManager, MultiAgentManager
+from src.core.agent import AgentManager
 from src.services.logging_service import LoggingService
 from src.services.llm_service import LLMService
 from src.core.memory import get_memory_service
-from src.routing import RoutingStrategy
 
 # Import tools that actually exist
 from src.tools.search import SearchTool
@@ -43,42 +42,26 @@ _agent_manager = None
 active_tasks: Dict[str, Any] = {}
 cancellation_flags: Dict[str, bool] = {}
 
-# Configuration: Set to True to enable multi-agent system
-USE_MULTI_AGENT_SYSTEM = True  # Change to False for classic mode
-
-
 def get_agent_manager():
     """
-    Get or create the global AgentManager/MultiAgentManager instance.
+    Get or create the global AgentManager instance.
     
     Returns:
-        AgentManager or MultiAgentManager instance
+        AgentManager instance
     """
     global _agent_manager
     if _agent_manager is None:
         # Create tools
         tools = create_tools_for_session("global")
         
-        if USE_MULTI_AGENT_SYSTEM:
-            # Use multi-agent system with intelligent routing
-            _agent_manager = MultiAgentManager(
-                llm_service=llm_service,
-                memory_service=memory_service,
-                logging_service=logger,
-                tools=tools,
-                enable_routing=True,
-                routing_strategy=RoutingStrategy.BALANCED
-            )
-            print("[AgentLogic] Multi-Agent system initialized with intelligent routing")
-        else:
-            # Use classic AgentManager
-            _agent_manager = AgentManager(
-                llm_service=llm_service,
-                memory_service=memory_service,
-                logging_service=logger,
-                tools=tools
-            )
-            print("[AgentLogic] Classic AgentManager initialized")
+        # Use LangGraph AgentManager
+        _agent_manager = AgentManager(
+            llm_service=llm_service,
+            memory_service=memory_service,
+            logging_service=logger,
+            tools=tools
+        )
+        print("[AgentLogic] AgentManager initialized with LangGraph workflow")
     
     return _agent_manager
 
@@ -165,7 +148,6 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     import threading
     
     print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
-    print(f"[AgentLogic] Mode: {'Multi-Agent' if USE_MULTI_AGENT_SYSTEM else 'Classic'}")
     
     # Initialize cancellation flag for this task
     cancellation_flags[message_id] = False
@@ -182,47 +164,32 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
             # Get the global manager instance
             manager = get_agent_manager()
             
-            # Create a proper asyncio task instead of using to_thread
-            # This allows proper cancellation
-            try:
-                if isinstance(manager, MultiAgentManager):
-                    # Use multi-agent execution
-                    task = asyncio.create_task(
-                        asyncio.to_thread(
-                            manager.execute_task_multi_agent,
-                            prompt=prompt,
-                            message_id=message_id,
-                            session_id=session_id,
-                            use_reason_agent=True
-                        )
-                    )
-                else:
-                    # Use classic execution
-                    task = asyncio.create_task(
-                        asyncio.to_thread(
-                            manager.execute_task,
-                            prompt=prompt,
-                            message_id=message_id,
-                            session_id=session_id
-                        )
-                    )
+            # Execute with LangGraph AgentManager
+            task = asyncio.create_task(
+                asyncio.to_thread(
+                    manager.execute_task,
+                    prompt=prompt,
+                    message_id=message_id,
+                    session_id=session_id
+                )
+            )
+            
+            # Store task reference for cancellation
+            active_tasks[message_id] = task
+            
+            # Wait for task with timeout
+            result = await asyncio.wait_for(task, timeout=TASK_TIMEOUT)
+            
+            # Clean up task reference on completion
+            if message_id in active_tasks:
+                del active_tasks[message_id]
+            if message_id in cancellation_flags:
+                del cancellation_flags[message_id]
+            
+            print(f"[AgentLogic] Task completed successfully")
+            return result
                 
-                # Store task reference for cancellation
-                active_tasks[message_id] = task
-                
-                # Wait for task with timeout
-                result = await asyncio.wait_for(task, timeout=TASK_TIMEOUT)
-                
-                # Clean up task reference on completion
-                if message_id in active_tasks:
-                    del active_tasks[message_id]
-                if message_id in cancellation_flags:
-                    del cancellation_flags[message_id]
-                
-                print(f"[AgentLogic] Task completed successfully")
-                return result
-                
-            except asyncio.TimeoutError:
+        except asyncio.TimeoutError:
                 error_msg = f"Task execution timeout after {TASK_TIMEOUT} seconds"
                 logger.error(error_msg, message_id)
                 logger.status(f"❌ {error_msg}")
@@ -310,24 +277,6 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
         return "Task interrupted by user"
 
 
-# Utility functions for runtime configuration
-def enable_multi_agent_mode():
-    """Enable multi-agent system mode (requires restart)."""
-    global USE_MULTI_AGENT_SYSTEM
-    USE_MULTI_AGENT_SYSTEM = True
-    print("[AgentLogic] Multi-agent mode enabled (restart required)")
-
-
-def enable_classic_mode():
-    """Enable classic AgentManager mode (requires restart)."""
-    global USE_MULTI_AGENT_SYSTEM
-    USE_MULTI_AGENT_SYSTEM = False
-    print("[AgentLogic] Classic mode enabled (restart required)")
-
-
-def get_current_mode():
-    """Get current execution mode."""
-    return "Multi-Agent" if USE_MULTI_AGENT_SYSTEM else "Classic"
 
 
 def cancel_task(message_id: str = None) -> Dict[str, Any]:
