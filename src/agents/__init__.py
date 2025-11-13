@@ -42,10 +42,6 @@ from src.agents.base_agent import (
     BaseAgent,
 )
 
-# Import specialized agents
-from src.agents.reason_agent import ReasonAgent
-from src.agents.executor_agent import ExecutorAgent
-
 __all__ = [
     # Enums
     "MessageType",
@@ -58,8 +54,4 @@ __all__ = [
     "AgentResult",
     "AgentTask",
     "BaseAgent",
-    
-    # Specialized Agents
-    "ReasonAgent",
-    "ExecutorAgent",
 ]
