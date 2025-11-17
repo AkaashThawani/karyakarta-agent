@@ -213,19 +213,19 @@ def setup_middleware(
         
     This is the recommended way to setup all middleware at once.
     """
-    # Error handling (should be first to catch all errors)
+    # CORS (should be first to handle preflight requests)
+    if enable_cors:
+        setup_cors(app, allowed_origins)
+
+    # Error handling (should be early to catch all errors)
     if enable_error_handling:
         app.middleware("http")(error_handling_middleware)
         logger.info("Error handling middleware enabled")
-    
+
     # Request logging
     if enable_logging:
         app.middleware("http")(request_logging_middleware)
         logger.info("Request logging middleware enabled")
-    
-    # CORS
-    if enable_cors:
-        setup_cors(app, allowed_origins)
     
     # Rate limiting
     if enable_rate_limiting:
