@@ -1,4 +1,4 @@
-name: 🚀 Deploy KaryaKarta to Production
+name: 🚀 Deploy KaryaKarta Backend to GCP
 
 on:
   push:
@@ -9,8 +9,6 @@ env:
   GCP_PROJECT_ID: karyakarta-478520
   GCP_REGION: us-central1
   SERVICE_NAME: karyakarta-agent
-  FRONTEND_DIR: karyakarta-ai
-  BACKEND_DIR: karyakarta-agent
 
 jobs:
   # Test Backend
@@ -33,45 +31,18 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        working-directory: ${{ env.BACKEND_DIR }}
         run: |
           pip install -r requirements.txt
 
       - name: Run tests
-        working-directory: ${{ env.BACKEND_DIR }}
         run: |
           # Add your actual test commands here
           python -c "import sys; sys.path.append('.'); from src.core.agent import Agent; print('✅ Backend imports work')"
           echo "Tests completed"
 
-  # Test Frontend
-  test-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm ci
-
-      - name: Run linter
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm run lint || echo "No lint script found"
-
-      - name: Build frontend
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm run build
-
   # Deploy Backend to GCP Cloud Run
   deploy-backend:
-    needs: [test-backend, test-frontend]
+    needs: test-backend
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
@@ -94,7 +65,6 @@ jobs:
           gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com secretmanager.googleapis.com --project ${{ env.GCP_PROJECT_ID }}
 
       - name: Build and Push Docker Image
-        working-directory: ${{ env.BACKEND_DIR }}
         run: |
           echo "🏗️ Building Docker image..."
           docker build -t gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
@@ -136,49 +106,15 @@ jobs:
           curl -f -m 30 $BACKEND_URL/health || (echo "❌ Backend health check failed" && exit 1)
           echo "✅ Backend is healthy!"
 
-  # Deploy Frontend to Vercel
-  deploy-frontend:
-    needs: deploy-backend
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ${{ env.FRONTEND_DIR }}
-
-      - name: Update Vercel Environment Variables
-        run: |
-          BACKEND_URL="${{ needs.deploy-backend.outputs.backend-url }}"
-          echo "🔧 Updating Vercel env vars..."
-          npx vercel env rm NEXT_PUBLIC_API_URL production --yes || echo "Env var doesn't exist yet"
-          npx vercel env add NEXT_PUBLIC_API_URL production <<< "$BACKEND_URL"
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ${{ env.FRONTEND_DIR }}
-          vercel-args: '--prod'
-
   # Post-deployment notification
   notify:
-    needs: [deploy-backend, deploy-frontend]
+    needs: deploy-backend
     runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Deployment Summary
         run: |
-          echo "🎉 Deployment completed!"
-          echo "📊 Status: ${{ needs.deploy-backend.result }} / ${{ needs.deploy-frontend.result }}"
+          echo "🎉 Backend deployment completed!"
+          echo "📊 Status: ${{ needs.deploy-backend.result }}"
           echo "🔗 Backend: ${{ needs.deploy-backend.outputs.backend-url }}"
-          echo "🌐 Frontend: Check Vercel dashboard for URL"
