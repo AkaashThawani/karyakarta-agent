@@ -123,6 +123,65 @@ class PlaywrightChartExtractor:
             print(f"[EXTRACT] Learning Manager not available: {e}")
             self.learning_manager = None
     
+    def _clean_html(self, tree: HTMLParser) -> None:
+        """
+        Remove unwanted elements from HTML tree - SVG, scripts, styles, etc.
+        
+        Args:
+            tree: HTMLParser tree to clean
+        """
+        remove_selectors = [
+            # Scripts and styles
+            'script', 'style', 'noscript', 'link[rel="stylesheet"]',
+            
+            # SVG and graphics - AGGRESSIVE
+            'svg', 'path', 'circle', 'rect', 'polygon', 'g', 'defs', 'use',
+            'image', 'clipPath', 'mask', 'pattern', 'line', 'polyline',
+            
+            # Media
+            'iframe', 'embed', 'object', 'video', 'audio', 'canvas',
+            
+            # Navigation and structure (keep minimal)
+            'nav', 'header', 'footer',
+            
+            # Ads and tracking
+            '[class*="ad"]', '[class*="banner"]', '[class*="popup"]',
+            '[data-test]', '[data-track]', '[data-analytics]'
+        ]
+        
+        for selector in remove_selectors:
+            try:
+                elements = tree.css(selector)
+                for element in elements:
+                    element.decompose()
+            except:
+                continue
+    
+    def _clean_text(self, text: str) -> str:
+        """
+        Clean extracted text - remove emojis, HTML, special chars.
+        
+        Args:
+            text: Raw text
+            
+        Returns:
+            Cleaned text
+        """
+        if not text:
+            return ""
+        
+        # Remove emojis
+        text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
+        text = re.sub(r'[\u2600-\u26FF\u2700-\u27BF]', '', text)
+        
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+    
     def _format_timestamp(self) -> str:
         """Format timestamp to match chart_tool format: HH:MM:SS.mmm"""
         t = time.time()
@@ -682,6 +741,9 @@ class PlaywrightChartExtractor:
         
         tree = HTMLParser(html)
         
+        # Clean HTML before extraction
+        self._clean_html(tree)
+        
         # Find containers
         containers = tree.css('table, ol, ul, [role="list"], div[class*="chart"], div[class*="list"]')
         
@@ -761,9 +823,8 @@ class PlaywrightChartExtractor:
             html = await asyncio.wait_for(page.content(), timeout=5.0)
             tree = HTMLParser(html)
             
-            # Remove scripts/styles
-            for tag in tree.css('script, style'):
-                tag.decompose()
+            # Clean HTML aggressively
+            self._clean_html(tree)
             
             # Get text content
             body = tree.body
@@ -821,8 +882,8 @@ JSON:"""
             html = await asyncio.wait_for(page.content(), timeout=5.0)
             tree = HTMLParser(html)
             
-            for tag in tree.css('script, style'):
-                tag.decompose()
+            # Clean HTML aggressively
+            self._clean_html(tree)
             
             # Get text content
             body = tree.body

@@ -566,14 +566,26 @@ Return ONLY valid JSON:"""
                 if domain.startswith('www.'):
                     domain = domain[4:]
 
-                # Check if domain exists in selector map
+                # Check if we already have elements in vector DB
                 selector_map = get_selector_map()
-
-                # Check if we have any cached data for this domain
+                
+                # Check both selector cache AND vector database
                 cache_file = selector_map.cache_dir / f"{domain}.json"
+                
+                # Check element_cache (vector DB) for existing elements
+                has_vector_data = False
+                try:
+                    from src.tools.semantic_element_selector import get_element_selector
+                    semantic_selector = get_element_selector()
+                    existing_elements = semantic_selector.get_elements_by_url(current_url)
+                    has_vector_data = existing_elements and len(existing_elements) > 0
+                    if has_vector_data:
+                        print(f"[PLAYWRIGHT] ✅ Element cache has {len(existing_elements)} elements for {domain}")
+                except Exception as e:
+                    print(f"[PLAYWRIGHT] Could not check element cache: {e}")
 
-                if not cache_file.exists() and domain not in self._learned_domains:
-                    print(f"[PLAYWRIGHT] 🆕 New site detected: {domain} - triggering auto-learning with Interactive Element Intelligence")
+                if not cache_file.exists() and not has_vector_data and domain not in self._learned_domains:
+                    print(f"[PLAYWRIGHT] 🆕 New site detected: {domain} - triggering auto-learning")
                     self._learned_domains.add(domain)
 
                     try:

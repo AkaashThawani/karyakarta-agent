@@ -19,6 +19,21 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 # ============================================================================
+# CORS OPTIONS HANDLERS (Fallback for CORS middleware)
+# ============================================================================
+
+@router.options("/")
+async def options_sessions():
+    """Handle CORS preflight for /sessions/"""
+    return {"status": "ok"}
+
+@router.options("/{session_id}")
+async def options_session_detail(session_id: str):
+    """Handle CORS preflight for /sessions/{session_id}"""
+    return {"status": "ok"}
+
+
+# ============================================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
