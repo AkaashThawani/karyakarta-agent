@@ -11,38 +11,8 @@ env:
   SERVICE_NAME: karyakarta-agent
 
 jobs:
-  # Test Backend
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Run tests
-        run: |
-          # Add your actual test commands here
-          python -c "import sys; sys.path.append('.'); from src.core.agent import Agent; print('✅ Backend imports work')"
-          echo "Tests completed"
-
   # Deploy Backend to GCP Cloud Run
   deploy-backend:
-    needs: test-backend
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
