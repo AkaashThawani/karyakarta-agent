@@ -30,10 +30,6 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
-      - name: Enable required APIs
-        run: |
-          gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com secretmanager.googleapis.com --project ${{ env.GCP_PROJECT_ID }}
-
       - name: Build and Push Docker Image
         run: |
           echo "🏗️ Building Docker image..."
