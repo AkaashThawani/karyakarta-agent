@@ -48,9 +48,9 @@ steps:
       - '80'
       # Environment variables (set these in Cloud Build or Secret Manager)
       - '--set-env-vars'
-      - 'ENVIRONMENT=production'
+      - 'ENVIRONMENT=production,HEADLESS=true'
       - '--update-secrets'
-      - 'GEMINI_API_KEY=gemini-api-key:latest,SERPER_API_KEY=serper-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_KEY=supabase-key:latest'
+      - 'GEMINI_API_KEY=gemini-api-key:latest,SERPER_API_KEY=serper-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_KEY=supabase-key:latest,BROWSERLESS_API_KEY=browserless-api-key:latest'
     id: 'deploy-cloud-run'
 
 # Images to push to Container Registry
