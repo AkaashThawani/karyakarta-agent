@@ -25,6 +25,10 @@ setup_middleware(
     allowed_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://karyakarta-ek2vro37i-akaashthawanis-projects.vercel.app",
+        "https://karyakarta-ai.vercel.app",
+        "https://karyakarta.com",
+        "*"  # Allow all for development
     ]
 )
 
