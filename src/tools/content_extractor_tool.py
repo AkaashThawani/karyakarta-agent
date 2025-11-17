@@ -42,24 +42,42 @@ class ContentExtractorTool(BaseTool):
     @property
     def description(self) -> str:
         """Tool description for LLM to understand when to use it."""
-        return "Extract clean, readable content from web pages for research and analysis. Removes scripts, styles, and HTML clutter while preserving semantic content."
+        return """Extract clean, readable content from web pages for research and analysis.
+
+IMPORTANT: This tool navigates to a NEW URL and extracts content.
+- Use for: NEW pages you need to visit and read
+- Do NOT use for: Current page you're already on
+- For current page: Use playwright_execute with method='evaluate' instead
+
+Removes scripts, styles, SVG, and HTML clutter while preserving semantic content."""
 
     def _execute_impl(self, **kwargs) -> ToolResult:
         """
         Execute content extraction implementation.
 
         Args:
-            **kwargs: Tool parameters (url required)
+            **kwargs: Tool parameters (url or content required)
 
         Returns:
             ToolResult with clean content
         """
-        url = kwargs.get('url')
+        # Accept both 'url' and 'content' parameter names
+        url = kwargs.get('url') or kwargs.get('content')
+        
         if not url:
             return ToolResult(
                 success=False,
                 error="URL parameter is required",
                 metadata={"tool": self.name}
+            )
+        
+        # Handle "current_page" special value - tool can't access current page
+        # Return error directing to use playwright_execute instead
+        if url == "current_page":
+            return ToolResult(
+                success=False,
+                error="Cannot extract from 'current_page'. Use playwright_execute with method='evaluate' and expression='document.body.innerText' to get current page content.",
+                metadata={"tool": self.name, "hint": "use_playwright_evaluate"}
             )
 
         if self.logger:

@@ -161,16 +161,38 @@ class ContentExtractor:
         Args:
             tree: HTML tree to clean
         """
-        # Elements to completely remove
+        # Elements to completely remove - AGGRESSIVE filtering
         remove_selectors = [
-            'script', 'style', 'noscript', 'iframe', 'svg', 'path',
+            # Scripts and styles
+            'script', 'style', 'noscript', 'link[rel="stylesheet"]',
+            
+            # SVG and graphics
+            'svg', 'path', 'circle', 'rect', 'polygon', 'g', 'defs', 'use',
+            'image', 'clipPath', 'mask', 'pattern',
+            
+            # Media
+            'iframe', 'embed', 'object', 'video', 'audio', 'canvas',
+            
+            # Navigation and structure
             'nav', 'header', 'footer', 'aside', 'sidebar',
+            
+            # Ads and tracking
             'advertisement', 'ad', 'banner', 'popup', 'modal',
             'cookie-notice', 'newsletter', 'social-share',
+            
+            # Class-based selectors
             '.ad', '.advertisement', '.banner', '.sidebar',
             '.nav', '.navigation', '.footer', '.header',
             '[class*="ad"]', '[class*="banner"]', '[class*="popup"]',
-            '[id*="ad"]', '[id*="banner"]', '[id*="popup"]'
+            '[class*="svg"]', '[class*="icon"]', '[class*="star"]',
+            '[class*="rating"]', '[class*="social"]',
+            
+            # ID-based selectors
+            '[id*="ad"]', '[id*="banner"]', '[id*="popup"]',
+            '[id*="svg"]', '[id*="icon"]',
+            
+            # Data attributes (tracking, analytics)
+            '[data-test]', '[data-track]', '[data-analytics]'
         ]
 
         for selector in remove_selectors:
@@ -289,7 +311,7 @@ class ContentExtractor:
 
     def _final_text_cleanup(self, text: str) -> str:
         """
-        Final cleanup of extracted text.
+        Final cleanup of extracted text - removes emojis, special chars, HTML remnants.
 
         Args:
             text: Raw extracted text
@@ -300,6 +322,17 @@ class ContentExtractor:
         if not text:
             return ""
 
+        # Remove emojis and special Unicode characters
+        text = re.sub(r'[\U00010000-\U0010ffff]', '', text)  # Remove emojis
+        text = re.sub(r'[\u2600-\u26FF\u2700-\u27BF]', '', text)  # Remove misc symbols
+        
+        # Remove any remaining HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Remove SVG-like patterns that might have been missed
+        text = re.sub(r'<svg[\s\S]*?</svg>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<path[\s\S]*?/>', '', text, flags=re.IGNORECASE)
+        
         # Remove excessive newlines
         text = re.sub(r'\n{3,}', '\n\n', text)
 
