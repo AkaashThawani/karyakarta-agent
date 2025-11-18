@@ -43,13 +43,18 @@ BROWSERLESS_ENDPOINT=wss://chrome.browserless.io
 
 ## Render Service Configuration
 
+**NO DOCKER NEEDED!** Render deploys Python apps natively.
+
 ```
 Name: karyakarta-agent
 Branch: render-deploy  ⚠️ IMPORTANT
 Root Directory: karyakarta-agent
+Runtime: Python 3
 Build Command: pip install -r requirements.txt
 Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
+
+**Note:** The Dockerfile exists for GCP deployment but Render ignores it and uses native Python deployment instead.
 
 ---
 
