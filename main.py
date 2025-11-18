@@ -19,7 +19,7 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Add middleware to handle X-Forwarded-Proto header from GCP Cloud Run
+# Add middleware to handle X-Forwarded-Proto header from proxy (Render, Cloud Run, etc.)
 @app.middleware("http")
 async def force_https_redirect(request: Request, call_next):
     """Force HTTPS in redirect URLs when behind a proxy"""
@@ -74,8 +74,17 @@ async def startup_event():
     
     # Check environment variables
     import os
+    
+    # Detect platform
+    if os.getenv('RENDER'):
+        platform = "Render"
+    elif os.getenv('K_SERVICE'):
+        platform = "Google Cloud Run"
+    else:
+        platform = "Local"
+    
     print(f"✓ Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    print(f"✓ K_SERVICE (Cloud Run): {os.getenv('K_SERVICE', 'Not set (local)')}")
+    print(f"✓ Platform: {platform}")
     print(f"✓ GEMINI_API_KEY: {'Set' if os.getenv('GEMINI_API_KEY') else 'MISSING!'}")
     print(f"✓ SUPABASE_URL: {'Set' if os.getenv('SUPABASE_URL') else 'MISSING!'}")
     print(f"✓ SUPABASE_SERVICE_KEY: {'Set' if os.getenv('SUPABASE_SERVICE_KEY') else 'MISSING!'}")
