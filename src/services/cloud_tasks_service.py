@@ -28,9 +28,9 @@ class CloudTasksService:
         """Initialize Cloud Tasks client."""
         try:
             self.client = tasks_v2.CloudTasksClient()
-            self.project = os.getenv('GCP_PROJECT_ID', 'karyakarta-agent')
-            self.location = os.getenv('GCP_REGION', 'us-central1')
-            self.queue = os.getenv('CLOUD_TASKS_QUEUE', 'agent-tasks')
+            self.project = os.getenv('GCP_PROJECT_ID') or 'karyakarta-478520'
+            self.location = os.getenv('GCP_REGION') or 'us-central1'
+            self.queue = os.getenv('CLOUD_TASKS_QUEUE') or 'agent-tasks'
             
             # Build queue path
             self.queue_path = self.client.queue_path(
