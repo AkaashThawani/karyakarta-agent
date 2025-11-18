@@ -59,10 +59,10 @@ def health_check():
 @router.post("/execute-task", response_model=TaskResponse)
 async def execute_task(request: TaskRequest):
     """
-    Execute an agent task in a separate thread.
+    Submit an agent task to Google Cloud Tasks.
     
-    Receives a task request with prompt, messageId, and sessionId,
-    immediately responds with acceptance, and runs the agent logic in a daemon thread.
+    Receives a task request and submits it to Cloud Tasks for async execution.
+    Returns immediately while the task runs in the background.
     
     Args:
         request: TaskRequest with prompt, messageId, and sessionId
@@ -75,28 +75,49 @@ async def execute_task(request: TaskRequest):
     print(f"  - Message ID: {request.messageId}")
     print(f"  - Session ID: {request.sessionId}")
     
-    print(f"[API] Starting background thread for agent task...")
-    
-    # Execute in a daemon thread (works reliably in Cloud Run)
-    thread = threading.Thread(
-        target=run_agent_task,
-        args=(request.prompt, request.messageId, request.sessionId or "default"),
-        daemon=True,
-        name=f"agent-task-{request.messageId}"
-    )
-    thread.start()
-    
-    print(f"[API] ✅ Thread started successfully for message: {request.messageId}")
-    print(f"[API] Thread name: {thread.name}, Thread alive: {thread.is_alive()}")
-    print(f"[API] Returning response to client...")
-    
-    # Return structured response using Pydantic model
-    return TaskResponse(
-        status="success",
-        messageId=request.messageId,
-        sessionId=request.sessionId or "default",
-        message="Agent task has been initiated in the background."
-    )
+    try:
+        from src.services.cloud_tasks_service import get_cloud_tasks_service
+        
+        print(f"[API] Submitting to Cloud Tasks...")
+        
+        # Submit to Cloud Tasks
+        tasks_service = get_cloud_tasks_service()
+        task_name = tasks_service.submit_agent_task(
+            prompt=request.prompt,
+            message_id=request.messageId,
+            session_id=request.sessionId or "default"
+        )
+        
+        print(f"[API] ✅ Task submitted to Cloud Tasks: {task_name}")
+        print(f"[API] Returning response to client...")
+        
+        # Return structured response
+        return TaskResponse(
+            status="success",
+            messageId=request.messageId,
+            sessionId=request.sessionId or "default",
+            message="Agent task submitted to Cloud Tasks for processing."
+        )
+        
+    except Exception as e:
+        print(f"[API] ❌ Failed to submit task: {e}")
+        
+        # Fallback to direct threading if Cloud Tasks fails
+        print(f"[API] Falling back to direct threading...")
+        thread = threading.Thread(
+            target=run_agent_task,
+            args=(request.prompt, request.messageId, request.sessionId or "default"),
+            daemon=True,
+            name=f"agent-task-{request.messageId}"
+        )
+        thread.start()
+        
+        return TaskResponse(
+            status="success",
+            messageId=request.messageId,
+            sessionId=request.sessionId or "default",
+            message="Agent task initiated (fallback mode)."
+        )
 
 
 class CancelRequest(BaseModel):

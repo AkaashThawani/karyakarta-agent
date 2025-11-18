@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from api.routes import router
 from api.session_routes import router as session_router
+from api.worker_routes import router as worker_router
 from api.middleware import setup_middleware
 import asyncio
 import logging
@@ -60,6 +61,7 @@ app.add_middleware(
 # Include routes
 app.include_router(router)
 app.include_router(session_router)
+app.include_router(worker_router)
 
 # Setup other middleware (logging, rate limiting, etc.)
 setup_middleware(app, enable_cors=False)  # Disable default CORS since we handle it dynamically
