@@ -146,8 +146,21 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     import signal
     from concurrent.futures import ThreadPoolExecutor
     import threading
+    import traceback
     
-    print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
+    print(f"\n{'='*60}")
+    print(f"[AgentLogic] ===== TASK STARTED =====")
+    print(f"[AgentLogic] Prompt: {prompt}")
+    print(f"[AgentLogic] Message ID: {message_id}")
+    print(f"[AgentLogic] Session ID: {session_id}")
+    print(f"{'='*60}\n")
+    
+    try:
+        print(f"[AgentLogic] Executing task - Session: {session_id}, Message: {message_id}")
+    except Exception as e:
+        print(f"[AgentLogic] FATAL ERROR at start: {e}")
+        traceback.print_exc()
+        return f"Error: {e}"
     
     # Initialize cancellation flag for this task
     cancellation_flags[message_id] = False
@@ -161,9 +174,12 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
         executor = ThreadPoolExecutor(max_workers=1)
         
         try:
+            print(f"[AgentLogic] Getting agent manager...")
             # Get the global manager instance
             manager = get_agent_manager()
+            print(f"[AgentLogic] Agent manager retrieved successfully")
             
+            print(f"[AgentLogic] Creating async task for agent execution...")
             # Execute with LangGraph AgentManager
             task = asyncio.create_task(
                 asyncio.to_thread(
@@ -173,6 +189,7 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
                     session_id=session_id
                 )
             )
+            print(f"[AgentLogic] Async task created, waiting for execution...")
             
             # Store task reference for cancellation
             active_tasks[message_id] = task
@@ -264,14 +281,24 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
     
     # Run with asyncio
     try:
+        print(f"[AgentLogic] Getting event loop...")
         loop = asyncio.get_event_loop()
+        print(f"[AgentLogic] Using existing event loop")
     except RuntimeError:
+        print(f"[AgentLogic] No event loop found, creating new one...")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        print(f"[AgentLogic] New event loop created")
     
     try:
+        print(f"[AgentLogic] Running execute_with_timeout()...")
         result = loop.run_until_complete(execute_with_timeout())
+        print(f"[AgentLogic] Task execution completed with result")
         return result
+    except Exception as e:
+        print(f"[AgentLogic] FATAL ERROR during execution: {e}")
+        traceback.print_exc()
+        return f"Error: {e}"
     except KeyboardInterrupt:
         print(f"[AgentLogic] Interrupted by user")
         return "Task interrupted by user"
