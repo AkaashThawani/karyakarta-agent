@@ -24,8 +24,8 @@ def get_frontend_url() -> str:
     
     Detection logic:
     1. If FRONTEND_URL env var is set, use it (manual override)
-    2. If running in Docker (/.dockerenv exists), use host.docker.internal
-    3. If ENVIRONMENT=production, use production URL
+    2. Check if GCP Cloud Run env var exists (production)
+    3. If running in Docker (/.dockerenv exists), use host.docker.internal
     4. Otherwise, use localhost (local development)
     
     Returns:
@@ -36,14 +36,14 @@ def get_frontend_url() -> str:
     if frontend_url:
         return frontend_url
     
+    # Check if running on GCP Cloud Run (K_SERVICE env var exists)
+    if os.getenv('K_SERVICE'):
+        # Production: Use Render frontend
+        return "https://karyakarta-ai.onrender.com/api/socket/log"
+    
     # Check if running in Docker
     if os.path.exists('/.dockerenv'):
         return "http://host.docker.internal:3000/api/socket/log"
-    
-    # Check if production
-    if os.getenv('ENVIRONMENT') == 'production':
-        # In production, you'd set FRONTEND_URL env var to your actual frontend URL
-        return os.getenv('FRONTEND_URL', 'https://your-frontend-url.vercel.app/api/socket/log')
     
     # Default to localhost for local development
     return "http://localhost:3000/api/socket/log"
