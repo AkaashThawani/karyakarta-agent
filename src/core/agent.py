@@ -108,7 +108,14 @@ class AgentManager:
                 session_id="user_456"
             )
         """
-        print(f"[AgentManager] Processing task - Session: {session_id}, Message: {message_id}")
+        print(f"\n{'='*70}")
+        print(f"[AgentManager] 📥 INPUT RECEIVED")
+        print(f"{'='*70}")
+        print(f"  Session ID: {session_id}")
+        print(f"  Message ID: {message_id}")
+        print(f"  Prompt: {prompt}")
+        print(f"  Prompt Length: {len(prompt)} chars")
+        print(f"{'='*70}\n")
         
         try:
             # Create workflow on first use (cached after that)
@@ -207,38 +214,59 @@ class AgentManager:
         """
         final_answer = None
         response_sent = False
+        step_count = 0
         
         try:
-            print(f"[Workflow] Starting workflow stream for prompt: {prompt[:50]}...")
+            print(f"\n{'='*70}")
+            print(f"[Workflow] 🚀 STARTING WORKFLOW")
+            print(f"{'='*70}")
+            print(f"  Prompt: {prompt[:100]}...")
+            print(f"  Available Tools: {[tool.name for tool in self.tools]}")
+            print(f"{'='*70}\n")
             
             # Stream the workflow execution
             for step in workflow_app.stream(
                 {"messages": [HumanMessage(content=prompt)]},
                 config=session_config
             ):
-                # Print step for debugging
-                print(f"[Workflow] Step received: {list(step.keys())}")
-                print(step)
+                step_count += 1
+                print(f"\n{'─'*70}")
+                print(f"[Workflow] 📍 STEP {step_count}: {list(step.keys())}")
+                print(f"{'─'*70}")
                 
                 # Skip if response already sent
                 if response_sent:
                     continue
                 
-                # Check agent node for final response
+                # Check agent node for decisions and responses
                 if "agent" in step:
                     messages = step['agent']['messages']
                     if messages:
                         last_message = messages[-1]
                         if isinstance(last_message, AIMessage):
-                            # Check if this is final answer (no tool calls)
+                            # Log LLM response metadata
+                            usage = getattr(last_message, 'usage_metadata', {})
+                            print(f"\n[Agent] 🤖 LLM RESPONSE:")
+                            print(f"  Input Tokens: {usage.get('input_tokens', 'N/A')}")
+                            print(f"  Output Tokens: {usage.get('output_tokens', 'N/A')}")
+                            print(f"  Model: {getattr(last_message, 'response_metadata', {}).get('model_name', 'N/A')}")
+                            
+                            # Check for tool calls
                             tool_calls = getattr(last_message, 'tool_calls', None)
-                            if not tool_calls or len(tool_calls) == 0:
+                            if tool_calls and len(tool_calls) > 0:
+                                print(f"\n[Agent] 🛠️  TOOL SELECTION:")
+                                for i, tool_call in enumerate(tool_calls, 1):
+                                    print(f"  Tool {i}: {tool_call['name']}")
+                                    print(f"  Arguments: {tool_call['args']}")
+                                    print(f"  Reason: Agent decided this tool can answer the query")
+                            else:
+                                # No tool calls - this is final answer
                                 if hasattr(last_message, 'content') and last_message.content:
                                     content = last_message.content
                                     
                                     # Handle Gemini's list of content objects
                                     if isinstance(content, list):
-                                        print(f"[AgentManager] Parsing list content: {len(content)} items")
+                                        print(f"[Agent] 📝 Parsing list content: {len(content)} items")
                                         text_parts = []
                                         for item in content:
                                             if isinstance(item, dict) and item.get('type') == 'text':
@@ -248,12 +276,20 @@ class AgentManager:
                                         final_answer = str(content)
                                     
                                     if final_answer:
+                                        print(f"\n[Agent] ✅ FINAL ANSWER:")
+                                        print(f"  {final_answer[:200]}...")
                                         response_sent = True
-                                        break  # Exit immediately
+                                        break
+                                    else:
+                                        print(f"\n[Agent] ⚠️  EMPTY RESPONSE - No content generated")
                 
-                # Log tool executions if needed
+                # Log tool executions
                 if "tools" in step:
-                    print(f"[Tools] {step}")
+                    tool_messages = step['tools']['messages']
+                    print(f"\n[Tools] 🔧 TOOL EXECUTION RESULTS:")
+                    for msg in tool_messages:
+                        print(f"  Tool: {msg.name}")
+                        print(f"  Result: {str(msg.content)[:200]}...")
                     
         except Exception as e:
             print(f"[AgentManager] Streaming error: {e}")
