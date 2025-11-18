@@ -64,6 +64,56 @@ app.include_router(session_router)
 # Setup other middleware (logging, rate limiting, etc.)
 setup_middleware(app, enable_cors=False)  # Disable default CORS since we handle it dynamically
 
+# Startup event - Initialize and verify services
+@app.on_event("startup")
+async def startup_event():
+    """Verify all services initialize correctly on startup"""
+    print("\n" + "="*60)
+    print("🚀 KARYAKARTA AGENT STARTUP")
+    print("="*60)
+    
+    # Check environment variables
+    import os
+    print(f"✓ Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    print(f"✓ K_SERVICE (Cloud Run): {os.getenv('K_SERVICE', 'Not set (local)')}")
+    print(f"✓ GEMINI_API_KEY: {'Set' if os.getenv('GEMINI_API_KEY') else 'MISSING!'}")
+    print(f"✓ SUPABASE_URL: {'Set' if os.getenv('SUPABASE_URL') else 'MISSING!'}")
+    print(f"✓ SUPABASE_SERVICE_KEY: {'Set' if os.getenv('SUPABASE_SERVICE_KEY') else 'MISSING!'}")
+    
+    # Test Supabase connection
+    try:
+        from src.services.supabase_service import get_supabase_service
+        supabase = get_supabase_service()
+        if supabase.health_check():
+            print("✅ Supabase: Connected")
+        else:
+            print("❌ Supabase: Health check failed")
+    except Exception as e:
+        print(f"❌ Supabase: Failed to initialize - {e}")
+    
+    # Test LLM service
+    try:
+        from src.services.llm_service import LLMService
+        from src.core.config import settings
+        llm_service = LLMService(settings)
+        model = llm_service.get_model()
+        print(f"✅ LLM Service: Initialized ({settings.llm_model})")
+    except Exception as e:
+        print(f"❌ LLM Service: Failed to initialize - {e}")
+    
+    # Test Agent Manager
+    try:
+        from agent_logic import get_agent_manager
+        manager = get_agent_manager()
+        stats = manager.get_stats()
+        print(f"✅ Agent Manager: Initialized ({stats['tools_count']} tools)")
+    except Exception as e:
+        print(f"❌ Agent Manager: Failed to initialize - {e}")
+    
+    print("="*60)
+    print("✅ Startup complete!")
+    print("="*60 + "\n")
+
 # Shutdown handler (Playwright cleanup)
 @app.on_event("shutdown")
 async def shutdown_event():

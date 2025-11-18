@@ -37,9 +37,16 @@ class LLMService:
         Args:
             settings: Application settings with LLM configuration
         """
+        print(f"[LLM] Initializing with model: {settings.llm_model}")
+        print(f"[LLM] Temperature: {settings.llm_temperature}")
+        print(f"[LLM] API key present: {bool(settings.GEMINI_API_KEY)}")
+        print(f"[LLM] API key length: {len(settings.GEMINI_API_KEY) if settings.GEMINI_API_KEY else 0}")
+        
         self.settings = settings
         self._model = None
         self._model_with_schema = {}  # Cache models by schema
+        
+        print("✅ [LLM] Service initialized (model will be created on first use)")
 
     def get_model(self) -> ChatGoogleGenerativeAI:
         """
@@ -49,14 +56,20 @@ class LLMService:
             Configured LLM model
         """
         if self._model is None:
-            self._model = ChatGoogleGenerativeAI(
-                model=self.settings.llm_model,
-                temperature=self.settings.llm_temperature,
-                google_api_key=self.settings.GEMINI_API_KEY,
-                max_output_tokens=8192,
-                top_p=0.95,
-                top_k=40
-            )
+            print(f"[LLM] Creating model instance: {self.settings.llm_model}")
+            try:
+                self._model = ChatGoogleGenerativeAI(
+                    model=self.settings.llm_model,
+                    temperature=self.settings.llm_temperature,
+                    google_api_key=self.settings.GEMINI_API_KEY,
+                    max_output_tokens=8192,
+                    top_p=0.95,
+                    top_k=40
+                )
+                print(f"✅ [LLM] Model created successfully: {self.settings.llm_model}")
+            except Exception as e:
+                print(f"❌ [LLM] Failed to create model: {e}")
+                raise
         return self._model
 
     def get_model_with_schema(self, schema: Dict[str, Any], schema_name: str = "response") -> Runnable:

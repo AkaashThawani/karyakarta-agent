@@ -31,15 +31,20 @@ class SupabaseService:
         self.url = url or os.getenv("SUPABASE_URL")
         self.key = key or os.getenv("SUPABASE_SERVICE_KEY")
         
+        print(f"[Supabase] Initializing with URL: {self.url[:40] if self.url else 'MISSING'}...")
+        print(f"[Supabase] Service key present: {bool(self.key)}")
+        
         if not self.url or not self.key:
-            raise ValueError(
-                "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment"
-            )
+            error_msg = "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment"
+            print(f"❌ [Supabase] {error_msg}")
+            raise ValueError(error_msg)
         
         try:
             self.client: Client = create_client(self.url, self.key)
+            print("✅ [Supabase] Client created successfully")
             logger.info("Supabase client initialized successfully")
         except Exception as e:
+            print(f"❌ [Supabase] Failed to create client: {e}")
             logger.error(f"Failed to initialize Supabase client: {e}")
             raise
     

@@ -209,12 +209,15 @@ class AgentManager:
         response_sent = False
         
         try:
+            print(f"[Workflow] Starting workflow stream for prompt: {prompt[:50]}...")
+            
             # Stream the workflow execution
             for step in workflow_app.stream(
                 {"messages": [HumanMessage(content=prompt)]},
                 config=session_config
             ):
                 # Print step for debugging
+                print(f"[Workflow] Step received: {list(step.keys())}")
                 print(step)
                 
                 # Skip if response already sent
