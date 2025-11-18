@@ -23,10 +23,11 @@ app = FastAPI(
 @app.middleware("http")
 async def force_https_redirect(request: Request, call_next):
     """Force HTTPS in redirect URLs when behind a proxy"""
-    # Get the forwarded protocol from GCP Cloud Run
-    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    # Only apply HTTPS forcing if we're behind a proxy (production)
+    # Check for X-Forwarded-Proto header which indicates we're behind a proxy
+    forwarded_proto = request.headers.get("x-forwarded-proto")
     
-    # Set the request URL scheme to the forwarded protocol
+    # Only modify scheme if we're actually behind a proxy
     if forwarded_proto == "https":
         request.scope["scheme"] = "https"
     
