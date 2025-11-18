@@ -75,6 +75,8 @@ async def execute_task(request: TaskRequest, background_tasks: BackgroundTasks):
     print(f"  - Message ID: {request.messageId}")
     print(f"  - Session ID: {request.sessionId}")
     
+    print(f"[API] Adding task to background queue...")
+    
     # Add the long-running agent task to the background
     background_tasks.add_task(
         run_agent_task, 
@@ -82,6 +84,10 @@ async def execute_task(request: TaskRequest, background_tasks: BackgroundTasks):
         request.messageId,
         request.sessionId or "default"
     )
+    
+    print(f"[API] ✅ Background task added successfully for message: {request.messageId}")
+    print(f"[API] Background task should start executing now...")
+    print(f"[API] Returning response to client...")
     
     # Return structured response using Pydantic model
     return TaskResponse(
