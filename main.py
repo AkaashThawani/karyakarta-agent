@@ -28,6 +28,7 @@ setup_middleware(
         "https://karyakarta-ek2vro37i-akaashthawanis-projects.vercel.app",
         "https://karyakarta-ai.vercel.app",
         "https://karyakarta.com",
+        "https://karyakarta-ai.onrender.com",
         "*"  # Allow all for development
     ]
 )
