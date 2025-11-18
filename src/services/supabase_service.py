@@ -179,23 +179,38 @@ class SupabaseService:
     
     def delete_session(self, session_id: str) -> bool:
         """
-        Delete session.
+        Delete session by either UUID (id) or session_id string.
         
         Args:
-            session_id: Session identifier (UUID)
+            session_id: Session identifier (UUID or session_id format)
             
         Returns:
             True if successful
         """
         try:
-            # Frontend sends the UUID (id field), not session_id field
-            self.client.table('sessions')\
+            # Try deleting by session_id field first (custom format like session_user_timestamp)
+            response = self.client.table('sessions')\
+                .delete()\
+                .eq('session_id', session_id)\
+                .execute()
+            
+            if response.data:
+                logger.info(f"Session deleted by session_id: {session_id}")
+                return True
+            
+            # Try deleting by id field (UUID)
+            response = self.client.table('sessions')\
                 .delete()\
                 .eq('id', session_id)\
                 .execute()
             
-            logger.info(f"Session deleted: {session_id}")
-            return True
+            if response.data:
+                logger.info(f"Session deleted by id: {session_id}")
+                return True
+            
+            # Not found in database
+            logger.warning(f"Session not found in database: {session_id}")
+            return False
         except Exception as e:
             logger.error(f"Failed to delete session {session_id}: {e}")
             return False

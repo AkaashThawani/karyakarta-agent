@@ -8,8 +8,6 @@ the Supabase service.
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import time
-import random
-import string
 import logging
 
 from src.services.supabase_service import get_supabase_service
@@ -53,27 +51,25 @@ class SessionService:
             
         Returns:
             Created session data
+            
+        Raises:
+            Exception if Supabase is unavailable or session creation fails
         """
         if not self.supabase:
-            # Fallback to in-memory session
-            return self._create_fallback_session(user_id, title)
+            raise RuntimeError("Supabase service not initialized")
         
-        try:
-            # Generate unique session ID
-            session_id = self._generate_session_id(user_id)
-            
-            # Create session in Supabase
-            session = self.supabase.create_session(
-                user_id=user_id,
-                session_id=session_id,
-                title=title or "New Chat"
-            )
-            
-            logger.info(f"Created session {session_id} for user {user_id}")
-            return session
-        except Exception as e:
-            logger.error(f"Failed to create session: {e}")
-            return self._create_fallback_session(user_id, title)
+        # Generate unique session ID
+        session_id = self._generate_session_id(user_id)
+        
+        # Create session in Supabase
+        session = self.supabase.create_session(
+            user_id=user_id,
+            session_id=session_id,
+            title=title or "New Chat"
+        )
+        
+        logger.info(f"Created session {session_id} for user {user_id}")
+        return session
     
     def get_or_create_session(
         self,
@@ -89,31 +85,30 @@ class SessionService:
             
         Returns:
             Session data
+            
+        Raises:
+            Exception if Supabase is unavailable or operation fails
         """
         if not self.supabase:
-            return self._create_fallback_session(user_id or "default")
+            raise RuntimeError("Supabase service not initialized")
         
-        try:
-            # Try to get existing session
-            session = self.supabase.get_session(session_id)
-            
-            if session:
-                return session
-            
-            # Session doesn't exist, create it
-            if not user_id:
-                # Extract user_id from session_id format: session_{user}_{timestamp}
-                parts = session_id.split('_')
-                user_id = parts[1] if len(parts) >= 3 else "default"
-            
-            return self.supabase.create_session(
-                user_id=user_id,
-                session_id=session_id,
-                title="New Chat"
-            )
-        except Exception as e:
-            logger.error(f"Failed to get or create session: {e}")
-            return self._create_fallback_session(user_id or "default")
+        # Try to get existing session
+        session = self.supabase.get_session(session_id)
+        
+        if session:
+            return session
+        
+        # Session doesn't exist, create it
+        if not user_id:
+            # Extract user_id from session_id format: session_{user}_{timestamp}
+            parts = session_id.split('_')
+            user_id = parts[1] if len(parts) >= 3 else "default"
+        
+        return self.supabase.create_session(
+            user_id=user_id,
+            session_id=session_id,
+            title="New Chat"
+        )
     
     def list_user_sessions(
         self,
@@ -297,34 +292,6 @@ class SessionService:
         """
         timestamp = int(time.time())
         return f"session_{user_id}_{timestamp}"
-    
-    def _create_fallback_session(
-        self,
-        user_id: str,
-        title: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Create fallback in-memory session when Supabase unavailable.
-        
-        Args:
-            user_id: User identifier
-            title: Optional title
-            
-        Returns:
-            Session data
-        """
-        session_id = self._generate_session_id(user_id)
-        return {
-            'id': ''.join(random.choices(string.ascii_letters, k=16)),
-            'user_id': user_id,
-            'session_id': session_id,
-            'title': title or "New Chat",
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat(),
-            'message_count': 0,
-            'total_tokens': 0,
-            'is_archived': False
-        }
     
     def get_session_summary(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
