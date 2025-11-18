@@ -1111,6 +1111,7 @@ Return ONLY valid JSON:"""
             method: str,
             url: Optional[str] = None,
             selector: Optional[str] = None,
+            selector_hint: Optional[str] = None,
             args: Optional[Dict[str, Any]] = None,
             close_after: Optional[bool] = False
         ) -> str:
@@ -1119,6 +1120,7 @@ Return ONLY valid JSON:"""
                 url=url,
                 method=method,
                 selector=selector,
+                selector_hint=selector_hint,
                 args=args or {},
                 close_after=close_after
             )
