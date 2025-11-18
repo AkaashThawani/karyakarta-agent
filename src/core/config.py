@@ -20,37 +20,25 @@ import os
 
 def get_frontend_url() -> str:
     """
-    Automatically detect the correct frontend URL based on environment.
-    
-    Detection logic:
-    1. If FRONTEND_URL env var is set, use it (manual override)
-    2. Check if GCP Cloud Run env var exists (production)
-    3. If running in Docker (/.dockerenv exists), use host.docker.internal
-    4. Otherwise, use localhost (local development)
+    Get frontend URL for logging.
     
     Returns:
         str: Frontend URL for WebSocket logging
     """
-    # Allow manual override
+    # Allow manual override if set
     frontend_url = os.getenv('FRONTEND_URL')
     if frontend_url:
         return frontend_url
     
-    # Check if running on Render (RENDER env var exists)
+    # Production on Render - use Render frontend URL
     if os.getenv('RENDER'):
-        # Production: Use Vercel frontend
-        return "https://karyakarta-ai.vercel.app/api/socket/log"
+        return "https://karyakarta-ai.onrender.com/api/socket/log"
     
-    # Check if running on GCP Cloud Run (K_SERVICE env var exists)
-    if os.getenv('K_SERVICE'):
-        # Production: Use Vercel frontend
-        return "https://karyakarta-ai.vercel.app/api/socket/log"
-    
-    # Check if running in Docker
+    # Docker
     if os.path.exists('/.dockerenv'):
         return "http://host.docker.internal:3000/api/socket/log"
     
-    # Default to localhost for local development
+    # Local development
     return "http://localhost:3000/api/socket/log"
 
 
