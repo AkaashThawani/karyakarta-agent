@@ -14,10 +14,11 @@ Usage:
     app.include_router(router)
 """
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 from pydantic import BaseModel
 import sys
 import os
+import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_logic import run_agent_task, cancel_task
 from src.models.message import TaskRequest, TaskResponse
@@ -56,16 +57,15 @@ def health_check():
 
 
 @router.post("/execute-task", response_model=TaskResponse)
-async def execute_task(request: TaskRequest, background_tasks: BackgroundTasks):
+async def execute_task(request: TaskRequest):
     """
-    Execute an agent task in the background.
+    Execute an agent task in a separate thread.
     
     Receives a task request with prompt, messageId, and sessionId,
-    immediately responds with acceptance, and runs the agent logic in the background.
+    immediately responds with acceptance, and runs the agent logic in a daemon thread.
     
     Args:
         request: TaskRequest with prompt, messageId, and sessionId
-        background_tasks: FastAPI background tasks manager
         
     Returns:
         TaskResponse: Success response with messageId and sessionId
@@ -75,18 +75,19 @@ async def execute_task(request: TaskRequest, background_tasks: BackgroundTasks):
     print(f"  - Message ID: {request.messageId}")
     print(f"  - Session ID: {request.sessionId}")
     
-    print(f"[API] Adding task to background queue...")
+    print(f"[API] Starting background thread for agent task...")
     
-    # Add the long-running agent task to the background
-    background_tasks.add_task(
-        run_agent_task, 
-        request.prompt, 
-        request.messageId,
-        request.sessionId or "default"
+    # Execute in a daemon thread (works reliably in Cloud Run)
+    thread = threading.Thread(
+        target=run_agent_task,
+        args=(request.prompt, request.messageId, request.sessionId or "default"),
+        daemon=True,
+        name=f"agent-task-{request.messageId}"
     )
+    thread.start()
     
-    print(f"[API] ✅ Background task added successfully for message: {request.messageId}")
-    print(f"[API] Background task should start executing now...")
+    print(f"[API] ✅ Thread started successfully for message: {request.messageId}")
+    print(f"[API] Thread name: {thread.name}, Thread alive: {thread.is_alive()}")
     print(f"[API] Returning response to client...")
     
     # Return structured response using Pydantic model
