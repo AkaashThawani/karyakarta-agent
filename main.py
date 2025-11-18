@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from api.routes import router
 from api.session_routes import router as session_router
 from api.middleware import setup_middleware
@@ -11,8 +12,26 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="KaryaKarta Agent API",
     description="AI Agent with Google Search and Web Scraping capabilities",
-    version="1.0.0"
+    version="1.0.0",
+    # Important: This tells FastAPI we're behind a proxy
+    root_path="",
+    # Configure to use forwarded headers from proxy
+    openapi_url="/openapi.json"
 )
+
+# Add middleware to handle X-Forwarded-Proto header from GCP Cloud Run
+@app.middleware("http")
+async def force_https_redirect(request: Request, call_next):
+    """Force HTTPS in redirect URLs when behind a proxy"""
+    # Get the forwarded protocol from GCP Cloud Run
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    
+    # Set the request URL scheme to the forwarded protocol
+    if forwarded_proto == "https":
+        request.scope["scheme"] = "https"
+    
+    response = await call_next(request)
+    return response
 
 # Dynamic CORS middleware to force HTTPS
 class DynamicCORSMiddleware(CORSMiddleware):
