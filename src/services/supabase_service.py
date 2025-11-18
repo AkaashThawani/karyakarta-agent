@@ -28,11 +28,13 @@ class SupabaseService:
             url: Supabase project URL (defaults to env var)
             key: Supabase service role key (defaults to env var)
         """
-        self.url = url or os.getenv("SUPABASE_URL")
-        self.key = key or os.getenv("SUPABASE_SERVICE_KEY")
+        # Get env vars and strip any whitespace/newlines
+        self.url = (url or os.getenv("SUPABASE_URL", "")).strip()
+        self.key = (key or os.getenv("SUPABASE_SERVICE_KEY", "")).strip()
         
         print(f"[Supabase] Initializing with URL: {self.url[:40] if self.url else 'MISSING'}...")
         print(f"[Supabase] Service key present: {bool(self.key)}")
+        print(f"[Supabase] URL length: {len(self.url)}")
         
         if not self.url or not self.key:
             error_msg = "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment"

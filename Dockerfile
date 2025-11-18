@@ -31,10 +31,6 @@ USER pwuser
 ENV PORT=8080
 EXPOSE 8080
 
-# Enable GRPC debug logging to diagnose Gemini API issues
-ENV GRPC_TRACE=all
-ENV GRPC_VERBOSITY=DEBUG
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
