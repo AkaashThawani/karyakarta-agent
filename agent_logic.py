@@ -279,25 +279,16 @@ def run_agent_task(prompt: str, message_id: str, session_id: str = "default"):
             # Shutdown executor
             executor.shutdown(wait=False)
     
-    # Run with asyncio
+    # Run with asyncio - Use asyncio.run() for proper event loop management in threads
     try:
-        print(f"[AgentLogic] Getting event loop...")
-        loop = asyncio.get_event_loop()
-        print(f"[AgentLogic] Using existing event loop")
-    except RuntimeError:
-        print(f"[AgentLogic] No event loop found, creating new one...")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        print(f"[AgentLogic] New event loop created")
-    
-    try:
-        print(f"[AgentLogic] Running execute_with_timeout()...")
-        result = loop.run_until_complete(execute_with_timeout())
-        print(f"[AgentLogic] Task execution completed with result")
+        print(f"[AgentLogic] Starting asyncio.run() with execute_with_timeout()...")
+        result = asyncio.run(execute_with_timeout())
+        print(f"[AgentLogic] ✅ Task execution completed successfully")
         return result
     except Exception as e:
-        print(f"[AgentLogic] FATAL ERROR during execution: {e}")
+        print(f"[AgentLogic] ❌ FATAL ERROR during execution: {e}")
         traceback.print_exc()
+        logger.error(f"Agent execution failed: {e}", message_id)
         return f"Error: {e}"
     except KeyboardInterrupt:
         print(f"[AgentLogic] Interrupted by user")
