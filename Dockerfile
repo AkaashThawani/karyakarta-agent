@@ -31,6 +31,10 @@ USER pwuser
 ENV PORT=8080
 EXPOSE 8080
 
+# Suppress verbose GRPC internal logs (timer_manager, etc)
+ENV GRPC_VERBOSITY=ERROR
+ENV GRPC_TRACE=""
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
