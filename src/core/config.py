@@ -36,10 +36,15 @@ def get_frontend_url() -> str:
     if frontend_url:
         return frontend_url
     
+    # Check if running on Render (RENDER env var exists)
+    if os.getenv('RENDER'):
+        # Production: Use Vercel frontend
+        return "https://karyakarta-ai.vercel.app/api/socket/log"
+    
     # Check if running on GCP Cloud Run (K_SERVICE env var exists)
     if os.getenv('K_SERVICE'):
-        # Production: Use Render frontend
-        return "https://karyakarta-ai.onrender.com/api/socket/log"
+        # Production: Use Vercel frontend
+        return "https://karyakarta-ai.vercel.app/api/socket/log"
     
     # Check if running in Docker
     if os.path.exists('/.dockerenv'):
