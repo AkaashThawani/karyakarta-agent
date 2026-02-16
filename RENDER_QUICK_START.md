@@ -50,9 +50,11 @@ Name: karyakarta-agent
 Branch: render-deploy  ⚠️ IMPORTANT
 Root Directory: karyakarta-agent
 Runtime: Python 3
-Build Command: pip install -r requirements.txt
+Build Command: pip install -r requirements.txt && playwright install --with-deps chromium
 Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
+
+**Important:** The build command installs Playwright browsers after pip packages. This is required for browser automation to work.
 
 **Note:** The Dockerfile exists for GCP deployment but Render ignores it and uses native Python deployment instead.
 

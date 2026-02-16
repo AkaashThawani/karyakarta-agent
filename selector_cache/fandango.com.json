@@ -1,0 +1,28 @@
+{
+  "playwright_execute": {
+    "search_input": {
+      "best": null,
+      "selectors": {
+        "#global-header-search-input": {
+          "success": 1,
+          "fail": 0,
+          "last_used": 1763495429.6095722,
+          "avg_response_time": 2.3837058544158936
+        }
+      },
+      "fallbacks": []
+    },
+    "Search button": {
+      "best": null,
+      "selectors": {
+        "#global-header-search-input": {
+          "success": 1,
+          "fail": 0,
+          "last_used": 1763495438.9698775,
+          "avg_response_time": 2.4337050914764404
+        }
+      },
+      "fallbacks": []
+    }
+  }
+}

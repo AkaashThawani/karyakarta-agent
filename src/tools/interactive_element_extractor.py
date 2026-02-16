@@ -131,7 +131,23 @@ class InteractiveElementExtractor(BaseTool):
     @property
     def description(self) -> str:
         """Tool description for LLM to understand when to use it."""
-        return "Extract interactive elements from web pages based on task type (search, navigate, form_fill, extract, click_action). Returns categorized elements with selectors and attributes."
+        return """IMPORTANT: This tool is for EXTRACTING/DISCOVERING elements from a URL - NOT for interacting with an already-open page!
+
+Use this tool to:
+- Discover what interactive elements exist on a page
+- Get selectors for buttons, inputs, links before interacting
+- Map out page structure
+
+DO NOT use this tool to:
+- Click buttons (use playwright_execute with method='click')
+- Fill forms (use playwright_execute with method='fill')
+- Select dropdowns (use playwright_execute with method='select_option')
+
+Parameters:
+- url (required): URL to extract elements from
+- task_type (required): One of: search, navigate, form_fill, extract, click_action
+
+Returns: Categorized elements with selectors and attributes"""
 
     def _execute_impl(self, **kwargs) -> ToolResult:
         """

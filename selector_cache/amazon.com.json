@@ -11,6 +11,18 @@
         }
       },
       "fallbacks": []
+    },
+    "Search Amazon": {
+      "best": null,
+      "selectors": {
+        "#twotabsearchtextbox": {
+          "success": 1,
+          "fail": 0,
+          "last_used": 1770930889.2186425,
+          "avg_response_time": 2.1051647663116455
+        }
+      },
+      "fallbacks": []
     }
   },
   "site_intelligence": {

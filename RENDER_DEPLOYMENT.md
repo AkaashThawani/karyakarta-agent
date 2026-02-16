@@ -31,7 +31,7 @@ git push origin render-deploy
 - **Branch**: `render-deploy` ⚠️ IMPORTANT: Select this branch
 - **Root Directory**: `karyakarta-agent`
 - **Runtime**: `Python 3`
-- **Build Command**: `pip install -r requirements.txt`
+- **Build Command**: `pip install -r requirements.txt && playwright install --with-deps chromium`
 - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 
 **Instance Type:**

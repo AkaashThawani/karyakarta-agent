@@ -263,14 +263,18 @@ class BaseTool(ABC):
         """
         Format result for LLM consumption.
         Override in subclass for custom formatting.
-        
+
         Args:
             result: The ToolResult to format
-            
+
         Returns:
-            str: Formatted result string
+            str: Formatted result string (JSON if dict/list)
         """
         if result.success:
+            # If data is dict or list, return as JSON for proper parsing
+            if isinstance(result.data, (dict, list)):
+                import json
+                return json.dumps(result.data, ensure_ascii=False, indent=2)
             return str(result.data)
         else:
             return f"Error: {result.error}"

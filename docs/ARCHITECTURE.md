@@ -22,11 +22,12 @@ KaryaKarta Agent is an AI-powered research assistant that uses LangGraph and Gem
 
 ### Key Features
 
-- **Multi-step Reasoning**: Agent breaks down complex queries into actionable steps
+- **LangGraph Workflow**: Single agent with iterative reasoning loop
+- **Intelligent Tool Selection**: Agent automatically selects and uses appropriate tools
 - **Generalist Tools**: Flexible tools that work across any domain (restaurants, events, dentists, etc.)
 - **Conversation Memory**: Maintains context across multiple messages
 - **Real-time Updates**: WebSocket-based communication for live progress updates
-- **Message Deduplication**: Robust tracking to prevent duplicate responses
+- **Session Management**: Robust session tracking with SQLite-based persistence
 
 ---
 
@@ -180,8 +181,8 @@ def create_workflow(tools: List[BaseTool]) -> CompiledGraph:
     workflow = StateGraph(MessagesState)
     
     # Add nodes
-    workflow.add_node("agent", call_model)
-    workflow.add_node("tools", tool_node)
+    workflow.add_node("agent", call_model)  # LLM analyzes and decides
+    workflow.add_node("tools", ToolNode(tools))  # Execute selected tool
     
     # Add edges
     workflow.set_entry_point("agent")
@@ -191,12 +192,15 @@ def create_workflow(tools: List[BaseTool]) -> CompiledGraph:
     return workflow.compile(checkpointer=memory)
 ```
 
-**Flow**:
-1. Agent receives user message
-2. Agent decides to use a tool or respond
-3. If tool: Execute tool → Return to agent
-4. If respond: Generate final answer
-5. Loop continues until agent decides to finish
+**Single Agent Flow**:
+1. **Agent Node**: LLM receives user message and analyzes task
+2. **Decision**: Agent decides whether to use a tool or provide final answer
+3. **Tool Execution** (if needed): Execute selected tool via ToolNode
+4. **Loop Back**: Tool results return to agent for review
+5. **Repeat or Finish**: Agent continues until task is complete
+6. **Final Response**: Agent provides answer when ready
+
+This is a **single-agent workflow** where one LLM iteratively uses tools until the task is complete.
 
 ### 3. Base Tool (`src/tools/base.py`)
 

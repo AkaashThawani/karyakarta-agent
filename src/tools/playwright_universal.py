@@ -372,56 +372,53 @@ Return ONLY valid JSON:"""
     
     @property
     def description(self) -> str:
-        return """Execute any Playwright Page method dynamically.
-        
-        This universal tool provides access to the complete Playwright API.
-        You can execute ANY Playwright Page method by specifying:
-        - method: The Playwright method name
-        - selector: CSS selector (if needed for element methods)
-        - args: Additional arguments as key-value pairs
-        
-        Common Methods:
-        
-        NAVIGATION:
-        - goto: Navigate to URL
-        - go_back: Go back in history
-        - go_forward: Go forward in history
-        - reload: Reload page
-        
-        INTERACTION:
-        - click: Click element
-        - fill: Fill input field
-        - press: Press keyboard key
-        - hover: Hover over element
-        - check: Check checkbox
-        - uncheck: Uncheck checkbox
-        - select_option: Select dropdown option
-        
-        CONTENT EXTRACTION:
-        - content: Get full HTML
-        - inner_text: Get element text
-        - inner_html: Get element HTML
-        - text_content: Get text content
-        - get_attribute: Get element attribute
-        
-        SCREENSHOTS:
-        - screenshot: Take screenshot (returns base64)
-        
-        WAITING:
-        - wait_for_selector: Wait for element
-        - wait_for_load_state: Wait for page load
-        - wait_for_timeout: Wait for time
-        
-        EVALUATION:
-        - evaluate: Execute JavaScript
-        
-        Example Usage:
-        1. Navigate: method="goto", args={"url": "https://example.com"}
-        2. Click: method="click", selector="button.submit"
-        3. Fill: method="fill", selector="input[name='email']", args={"value": "test@example.com"}
-        4. Screenshot: method="screenshot", args={"path": "screenshot.png", "full_page": True}
-        5. Get text: method="inner_text", selector="h1"
-        """
+        return """PRIMARY TOOL for all browser interactions! Use this for EVERYTHING related to an open browser page.
+
+CRITICAL: This tool works with the CURRENTLY OPEN PAGE. You do NOT need to provide a URL after the first goto!
+
+🎯 MOST IMPORTANT METHODS:
+
+NAVIGATION (first action only):
+- goto: Navigate to URL (ONLY use once to start)
+
+INTERACTION (use these for multi-step flows):
+- click: Click any element (buttons, links, etc.)
+  Example: method="click", selector_hint="login button"
+
+- fill: Fill input fields
+  Example: method="fill", selector_hint="email input", args={"value": "user@example.com"}
+
+- select_option: ⭐ SELECT DROPDOWN OPTIONS ⭐
+  Example: method="select_option", selector="select[name='date']", args={"value": "2026-02-15"}
+  OR: method="select_option", selector_hint="date dropdown", args={"label": "Saturday"}
+
+- press: Press keyboard keys
+  Example: method="press", args={"key": "Enter"}
+
+CONTENT EXTRACTION (get data from page):
+- evaluate: Execute JavaScript to get page content
+  Example: method="evaluate", args={"expression": "document.body.innerText"}
+
+- inner_text: Get visible text from element
+  Example: method="inner_text", selector="h1"
+
+SMART SELECTOR RESOLUTION:
+- Use selector_hint (preferred): semantic description like "search button", "email input", "date dropdown"
+- Use selector (fallback): CSS selector like "button#submit", "input[name='email']"
+
+MULTI-STEP FLOWS:
+1. goto (URL) → navigate once
+2. click (selector_hint) → interact with element
+3. select_option (selector + args) → choose from dropdown
+4. evaluate → extract results
+Do NOT try to navigate again after step 1!
+
+Example Complete Flow:
+1. method="goto", url="https://example.com/search"
+2. method="click", selector_hint="date dropdown"  # Opens dropdown
+3. method="select_option", selector="select[name='date']", args={"value": "2026-02-15"}  # Selects date
+4. method="evaluate", args={"expression": "document.body.innerText"}  # Gets results
+"""
     
     def validate_params(self, **kwargs) -> bool:
         if "kwargs" in kwargs:

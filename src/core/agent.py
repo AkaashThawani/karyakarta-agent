@@ -18,7 +18,11 @@ from src.tools.base import BaseTool
 from src.services.logging_service import LoggingService
 from src.services.llm_service import LLMService
 from src.core.memory import MemoryService
-from src.core.graph import create_workflow
+try:
+    from src.core.graph_v2 import create_enhanced_workflow
+except ImportError as e:
+    print(f"[AgentManager] Warning: Could not import enhanced workflow: {e}")
+    from src.core.graph import create_workflow as create_enhanced_workflow
 from src.services.session_service import get_session_service
 
 class AgentManager:
@@ -129,10 +133,11 @@ class AgentManager:
                     elif log_type == "status":
                         self.logger.status(message, message_id)
                 
-                self.workflow_app = create_workflow(
+                self.workflow_app = create_enhanced_workflow(
                     tools=self.langchain_tools,
                     model_with_tools=self.model_with_tools,
                     checkpointer=self.checkpointer,
+                    llm_service=self.llm_service,
                     logger_callback=log_callback
                 )
             
@@ -244,12 +249,13 @@ class AgentManager:
                     if messages:
                         last_message = messages[-1]
                         if isinstance(last_message, AIMessage):
-                            # Log LLM response metadata
-                            usage = getattr(last_message, 'usage_metadata', {})
+                            # Log LLM response metadata (with safety checks)
+                            usage = getattr(last_message, 'usage_metadata', {}) or {}
+                            response_meta = getattr(last_message, 'response_metadata', {}) or {}
                             print(f"\n[Agent] 🤖 LLM RESPONSE:")
                             print(f"  Input Tokens: {usage.get('input_tokens', 'N/A')}")
                             print(f"  Output Tokens: {usage.get('output_tokens', 'N/A')}")
-                            print(f"  Model: {getattr(last_message, 'response_metadata', {}).get('model_name', 'N/A')}")
+                            print(f"  Model: {response_meta.get('model_name', 'N/A')}")
                             
                             # Check for tool calls
                             tool_calls = getattr(last_message, 'tool_calls', None)

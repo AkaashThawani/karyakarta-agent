@@ -1,8 +1,8 @@
 # KaryaKarta Agent 🤖
 
-**AI-Powered Multi-Agent Research Assistant**
+**AI-Powered Intelligent Research Assistant**
 
-KaryaKarta Agent is an intelligent backend system that uses Google Gemini and LangGraph to perform complex multi-step reasoning tasks. Built with a modern multi-agent architecture, it can intelligently decompose tasks, execute tools, and provide real-time progress updates.
+KaryaKarta Agent is an intelligent backend system that uses Google Gemini and LangGraph to perform complex multi-step reasoning tasks. Built with a modern LangGraph workflow architecture, it intelligently selects tools, executes them, and provides real-time progress updates.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
@@ -13,10 +13,10 @@ KaryaKarta Agent is an intelligent backend system that uses Google Gemini and La
 
 ## 🌟 Key Features
 
-### Multi-Agent Architecture
-- **Reason Agent**: High-level task planning and decomposition using LLM
-- **Executor Agent**: Specialized tool execution with retry logic
-- **Smart Routing**: Intelligent tool selection based on task requirements
+### Intelligent Agent System
+- **LangGraph Workflow**: Single agent with intelligent tool selection and execution
+- **Smart Tool Routing**: Automatic tool selection based on task requirements
+- **Iterative Reasoning**: Agent loops between planning and execution until task completion
 
 ### Advanced Capabilities
 - 🔍 **Web Search & Scraping**: Multi-tier scraping with fast-fail fallback (78% faster)
@@ -44,26 +44,31 @@ KaryaKarta Agent is an intelligent backend system that uses Google Gemini and La
 └─────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────┐
-│              Reason Agent (Planning)            │
-│  • Analyzes task complexity                     │
-│  • Decomposes into subtasks                     │
-│  • Routes to appropriate tools                  │
+│              LangGraph Agent                    │
+│  • Analyzes user task                           │
+│  • Decides: Use tool or respond?                │
+│  • Selects appropriate tool if needed           │
 └─────────────────────────────────────────────────┘
                         ↓
-┌─────────────────────────────────────────────────┐
-│           Executor Agent (Execution)            │
-│  • Executes tools with retry logic              │
-│  • Handles errors gracefully                    │
-│  • Returns structured results                   │
-└─────────────────────────────────────────────────┘
-                        ↓
-┌─────────────────────────────────────────────────┐
-│                Tool Execution                    │
-│  • Search (Google Serper API)                   │
-│  • Scraper (Multi-tier with compression)        │
-│  • Playwright (38 browser automation tools)     │
-│  • Calculator, Extractor, Chunk Reader          │
-└─────────────────────────────────────────────────┘
+                   ┌────┴────┐
+                   │         │
+            ┌──────▼──┐  ┌───▼──────┐
+            │ Execute │  │  Final   │
+            │  Tool   │  │ Response │
+            └──────┬──┘  └──────────┘
+                   │
+                   │ Loop back
+                   ▼
+         ┌─────────────────┐
+         │  Agent Reviews  │
+         │  Tool Result    │
+         └─────────────────┘
+
+Available Tools:
+  • Search (Google Serper API)
+  • Scraper (Multi-tier with compression)
+  • Playwright (38 browser automation tools)
+  • Calculator, Extractor, Chunk Reader
 ```
 
 ### Tech Stack
@@ -210,11 +215,11 @@ See [tool_registry.json](tool_registry.json) for complete list.
 
 ### Recent Achievements
 
-- ✅ Multi-agent system (Reason + Executor agents)
+- ✅ LangGraph workflow with intelligent tool selection
 - ✅ 38 Playwright tools dynamically registered
 - ✅ Smart compression (81% token cost reduction)
 - ✅ Fast-fail fallback (78% faster)
-- ✅ LLM-based task decomposition
+- ✅ Iterative agent reasoning loop
 - ✅ Session management with SQLite
 - ✅ 67 unit tests (97% pass rate)
 
@@ -309,14 +314,14 @@ pytest --cov=src --cov-report=html
 karyakarta-agent/
 ├── docs/               # Documentation
 ├── src/
-│   ├── agents/        # Reason & Executor agents
-│   ├── core/          # Core functionality
+│   ├── core/          # Core functionality (AgentManager, LangGraph workflow)
 │   ├── tools/         # Tool implementations
-│   ├── routing/       # Task routing & decomposition
-│   ├── prompts/       # Agent prompts
+│   ├── routing/       # Task routing & tool registry
+│   ├── prompts/       # System prompts
 │   ├── services/      # Services (LLM, logging, memory)
+│   ├── models/        # Data models (Message, Session, ToolResult)
 │   └── utils/         # Utilities
-├── api/               # FastAPI routes
+├── api/               # FastAPI routes & middleware
 ├── tests/             # Test suite
 ├── main.py            # Application entry point
 └── requirements.txt   # Python dependencies
